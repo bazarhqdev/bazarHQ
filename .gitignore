@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Test output
+coverage/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Supabase local temporary files
+supabase/.temp/
+
+# Android build output and signing keys
+.gradle/
+android/app/build/
+android/build/
+*.jks
+*.keystore
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editors and operating systems
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Incomplete downloads
+*.crdownload
