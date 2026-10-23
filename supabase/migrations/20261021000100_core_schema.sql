@@ -51,25 +51,7 @@ end;
 $$;
 
 
--- Return true only when the authenticated active Merchant owns this store.
--- SECURITY DEFINER avoids recursive RLS evaluation on the ownership lookup.
-create or replace function public.owns_store(p_store_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-    select exists (
-        select 1
-        from public.stores s
-        join public.profiles p on p.id = s.owner_id
-        where s.id = p_store_id
-          and s.owner_id = (select auth.uid())
-          and p.role = 'merchant'
-          and p.status = 'active'
-    );
-$$;
+
 
 
 -- Return true only for the authenticated active Super Admin.
@@ -210,6 +192,26 @@ comment on column public.stores.return_window_days is
     'Merchant-configurable return window; approved default is seven calendar days.';
 comment on column public.stores.onboarding_state is
     'Non-secret onboarding progress only; never store credentials or tokens here.';
+
+-- Return true only when the authenticated active Merchant owns this store.
+-- SECURITY DEFINER avoids recursive RLS evaluation on the ownership lookup.
+create or replace function public.owns_store(p_store_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+    select exists (
+        select 1
+        from public.stores s
+        join public.profiles p on p.id = s.owner_id
+        where s.id = p_store_id
+          and s.owner_id = (select auth.uid())
+          and p.role = 'merchant'
+          and p.status = 'active'
+    );
+$$;
 
 
 create or replace function public.validate_store_owner_and_theme()
@@ -586,7 +588,7 @@ create table public.order_items (
     variant_label_snapshot text,
     quantity integer not null check (quantity > 0),
     unit_price numeric(12,2) not null check (unit_price >= 0),
-    subtotal numeric(12,2) not null check (subtotal >= 0),
+    subtotal numeric(12,2) not null,
     created_at timestamptz not null default now(),
 
     constraint order_items_order_store_fk

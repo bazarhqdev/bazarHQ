@@ -51,8 +51,28 @@ $$;
 revoke all on function public.current_active_app_role() from public;
 grant execute on function public.current_active_app_role() to anon, authenticated, service_role;
 
--- safe_uuid(text) already exists in migration 001 and returns NULL for invalid UUID
--- input. Keep that canonical implementation; Storage policies use it below.
+-- Safely parse UUID text used in Storage paths and RLS policies.
+-- Invalid UUID strings return NULL instead of aborting the query.
+
+create or replace function public.safe_uuid(p_value text)
+returns uuid
+language plpgsql
+immutable
+parallel safe
+set search_path = ''
+as $function$
+begin
+    if p_value is null or btrim(p_value) = '' then
+        return null;
+    end if;
+
+    return p_value::uuid;
+
+exception
+    when invalid_text_representation then
+        return null;
+end;
+$function$;
 
 -- Migration 003 currently contains a legacy RLS branch using is_super_admin().
 -- RLS cannot prove the required network allowlist or TOTP verification. Fail
@@ -194,7 +214,6 @@ grant delete on public.categories to authenticated;
 
 -- Image metadata writes are allowed only for owned products and validated paths.
 grant insert (
-    store_id,
     product_id,
     storage_path,
     is_primary,
@@ -427,7 +446,6 @@ with check (
     and split_part(storage_path, '/', 5) <> ''
     and public.safe_uuid(split_part(storage_path, '/', 2)) is not null
     and public.safe_uuid(split_part(storage_path, '/', 4)) = product_id
-and store_id = public.safe_uuid(split_part(storage_path, '/', 2))
 and (select public.current_active_app_role()) = 'merchant'
     and exists (
         select 1 from public.products p
@@ -805,19 +823,19 @@ create policy product_images_storage_select_published_or_own
 on storage.objects for select to anon, authenticated
 using (
     bucket_id = 'product-images'
-    and cardinality(string_to_array(name, '/')) = 5
-    and cardinality(storage.foldername(name)) = 4
-    and (storage.foldername(name))[1] = 'stores'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'products'
-    and public.safe_uuid((storage.foldername(name))[4]) is not null
-    and split_part(name, '/', 5) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 5
+    and cardinality(storage.foldername(storage.objects.name)) = 4
+    and (storage.foldername(storage.objects.name))[1] = 'stores'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'products'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[4]) is not null
+    and split_part(storage.objects.name, '/', 5) <> ''
     and exists (
         select 1
         from public.products p
         join public.stores s on s.id = p.store_id
-        where p.id = public.safe_uuid((storage.foldername(name))[4])
-          and s.id = public.safe_uuid((storage.foldername(name))[2])
+        where p.id = public.safe_uuid((storage.foldername(storage.objects.name))[4])
+          and s.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and p.store_id = s.id
           and (
               (
@@ -840,18 +858,18 @@ create policy product_images_storage_insert_own_product
 on storage.objects for insert to authenticated
 with check (
     bucket_id = 'product-images'
-    and cardinality(string_to_array(name, '/')) = 5
-    and cardinality(storage.foldername(name)) = 4
-    and (storage.foldername(name))[1] = 'stores'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'products'
-    and public.safe_uuid((storage.foldername(name))[4]) is not null
-    and split_part(name, '/', 5) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 5
+    and cardinality(storage.foldername(storage.objects.name)) = 4
+    and (storage.foldername(storage.objects.name))[1] = 'stores'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'products'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[4]) is not null
+    and split_part(storage.objects.name, '/', 5) <> ''
     and (select public.current_active_app_role()) = 'merchant'
     and exists (
         select 1 from public.products p
-        where p.id = public.safe_uuid((storage.foldername(name))[4])
-          and p.store_id = public.safe_uuid((storage.foldername(name))[2])
+        where p.id = public.safe_uuid((storage.foldername(storage.objects.name))[4])
+          and p.store_id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (select public.owns_store(p.store_id))
     )
 );
@@ -862,20 +880,20 @@ create policy product_images_storage_delete_own_product
 on storage.objects for delete to authenticated
 using (
     bucket_id = 'product-images'
-    and cardinality(string_to_array(name, '/')) = 5
-    and cardinality(storage.foldername(name)) = 4
-    and (storage.foldername(name))[1] = 'stores'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'products'
-    and public.safe_uuid((storage.foldername(name))[4]) is not null
-    and split_part(name, '/', 5) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 5
+    and cardinality(storage.foldername(storage.objects.name)) = 4
+    and (storage.foldername(storage.objects.name))[1] = 'stores'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'products'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[4]) is not null
+    and split_part(storage.objects.name, '/', 5) <> ''
     and (select public.current_active_app_role()) = 'merchant'
     and exists (
         select 1
         from public.products p
         join public.product_images pi on pi.product_id = p.id
-        where p.id = public.safe_uuid((storage.foldername(name))[4])
-          and p.store_id = public.safe_uuid((storage.foldername(name))[2])
+        where p.id = public.safe_uuid((storage.foldername(storage.objects.name))[4])
+          and p.store_id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and pi.storage_path = storage.objects.name
           and (select public.owns_store(p.store_id))
     )
@@ -894,15 +912,15 @@ create policy store_logos_storage_select_published_or_own
 on storage.objects for select to anon, authenticated
 using (
     bucket_id = 'store-logos'
-    and cardinality(string_to_array(name, '/')) = 4
-    and cardinality(storage.foldername(name)) = 3
-    and (storage.foldername(name))[1] = 'stores'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'logos'
-    and split_part(name, '/', 4) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 4
+    and cardinality(storage.foldername(storage.objects.name)) = 3
+    and (storage.foldername(storage.objects.name))[1] = 'stores'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'logos'
+    and split_part(storage.objects.name, '/', 4) <> ''
     and exists (
         select 1 from public.stores s
-        where s.id = public.safe_uuid((storage.foldername(name))[2])
+        where s.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (
               (s.status = 'published' and s.logo_url = storage.objects.name)
               or (
@@ -917,30 +935,30 @@ create policy store_logos_storage_insert_own
 on storage.objects for insert to authenticated
 with check (
     bucket_id = 'store-logos'
-    and cardinality(string_to_array(name, '/')) = 4
-    and cardinality(storage.foldername(name)) = 3
-    and (storage.foldername(name))[1] = 'stores'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'logos'
-    and split_part(name, '/', 4) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 4
+    and cardinality(storage.foldername(storage.objects.name)) = 3
+    and (storage.foldername(storage.objects.name))[1] = 'stores'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'logos'
+    and split_part(storage.objects.name, '/', 4) <> ''
     and (select public.current_active_app_role()) = 'merchant'
-    and (select public.owns_store(public.safe_uuid((storage.foldername(name))[2])))
+    and (select public.owns_store(public.safe_uuid((storage.foldername(storage.objects.name))[2])))
 );
 
 create policy store_logos_storage_delete_unreferenced_own
 on storage.objects for delete to authenticated
 using (
     bucket_id = 'store-logos'
-    and cardinality(string_to_array(name, '/')) = 4
-    and cardinality(storage.foldername(name)) = 3
-    and (storage.foldername(name))[1] = 'stores'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'logos'
-    and split_part(name, '/', 4) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 4
+    and cardinality(storage.foldername(storage.objects.name)) = 3
+    and (storage.foldername(storage.objects.name))[1] = 'stores'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'logos'
+    and split_part(storage.objects.name, '/', 4) <> ''
     and (select public.current_active_app_role()) = 'merchant'
     and exists (
         select 1 from public.stores s
-        where s.id = public.safe_uuid((storage.foldername(name))[2])
+        where s.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (select public.owns_store(s.id))
           and s.logo_url is distinct from storage.objects.name
     )
@@ -958,15 +976,15 @@ create policy delivery_evidence_storage_select_participant
 on storage.objects for select to authenticated
 using (
     bucket_id = 'delivery-evidence'
-    and cardinality(string_to_array(name, '/')) = 4
-    and cardinality(storage.foldername(name)) = 3
-    and (storage.foldername(name))[1] = 'orders'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'delivery'
-    and split_part(name, '/', 4) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 4
+    and cardinality(storage.foldername(storage.objects.name)) = 3
+    and (storage.foldername(storage.objects.name))[1] = 'orders'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'delivery'
+    and split_part(storage.objects.name, '/', 4) <> ''
     and exists (
         select 1 from public.orders o
-        where o.id = public.safe_uuid((storage.foldername(name))[2])
+        where o.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (
               o.customer_id = (select auth.uid())
               or (
@@ -981,16 +999,16 @@ create policy delivery_evidence_storage_insert_own_merchant_order
 on storage.objects for insert to authenticated
 with check (
     bucket_id = 'delivery-evidence'
-    and cardinality(string_to_array(name, '/')) = 4
-    and cardinality(storage.foldername(name)) = 3
-    and (storage.foldername(name))[1] = 'orders'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and (storage.foldername(name))[3] = 'delivery'
-    and split_part(name, '/', 4) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 4
+    and cardinality(storage.foldername(storage.objects.name)) = 3
+    and (storage.foldername(storage.objects.name))[1] = 'orders'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and (storage.foldername(storage.objects.name))[3] = 'delivery'
+    and split_part(storage.objects.name, '/', 4) <> ''
     and (select public.current_active_app_role()) = 'merchant'
     and exists (
         select 1 from public.orders o
-        where o.id = public.safe_uuid((storage.foldername(name))[2])
+        where o.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (select public.owns_store(o.store_id))
     )
 );
@@ -1006,16 +1024,16 @@ create policy return_evidence_storage_select_participant
 on storage.objects for select to authenticated
 using (
     bucket_id = 'return-evidence'
-    and cardinality(string_to_array(name, '/')) = 3
-    and cardinality(storage.foldername(name)) = 2
-    and (storage.foldername(name))[1] = 'returns'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and split_part(name, '/', 3) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 3
+    and cardinality(storage.foldername(storage.objects.name)) = 2
+    and (storage.foldername(storage.objects.name))[1] = 'returns'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and split_part(storage.objects.name, '/', 3) <> ''
     and exists (
         select 1
         from public.returns r
         join public.orders o on o.id = r.order_id
-        where r.id = public.safe_uuid((storage.foldername(name))[2])
+        where r.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (
               r.customer_id = (select auth.uid())
               or (
@@ -1030,15 +1048,15 @@ create policy return_evidence_storage_insert_own_return
 on storage.objects for insert to authenticated
 with check (
     bucket_id = 'return-evidence'
-    and cardinality(string_to_array(name, '/')) = 3
-    and cardinality(storage.foldername(name)) = 2
-    and (storage.foldername(name))[1] = 'returns'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and split_part(name, '/', 3) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 3
+    and cardinality(storage.foldername(storage.objects.name)) = 2
+    and (storage.foldername(storage.objects.name))[1] = 'returns'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and split_part(storage.objects.name, '/', 3) <> ''
     and (select public.current_active_app_role()) = 'customer'
     and exists (
         select 1 from public.returns r
-        where r.id = public.safe_uuid((storage.foldername(name))[2])
+        where r.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and r.customer_id = (select auth.uid())
     )
 );
@@ -1054,14 +1072,14 @@ create policy support_attachments_storage_select_participant
 on storage.objects for select to authenticated
 using (
     bucket_id = 'support-attachments'
-    and cardinality(string_to_array(name, '/')) = 3
-    and cardinality(storage.foldername(name)) = 2
-    and (storage.foldername(name))[1] = 'tickets'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and split_part(name, '/', 3) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 3
+    and cardinality(storage.foldername(storage.objects.name)) = 2
+    and (storage.foldername(storage.objects.name))[1] = 'tickets'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and split_part(storage.objects.name, '/', 3) <> ''
     and exists (
         select 1 from public.support_tickets t
-        where t.id = public.safe_uuid((storage.foldername(name))[2])
+        where t.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (
               t.customer_id = (select auth.uid())
               or (
@@ -1078,14 +1096,14 @@ create policy support_attachments_storage_insert_participant
 on storage.objects for insert to authenticated
 with check (
     bucket_id = 'support-attachments'
-    and cardinality(string_to_array(name, '/')) = 3
-    and cardinality(storage.foldername(name)) = 2
-    and (storage.foldername(name))[1] = 'tickets'
-    and public.safe_uuid((storage.foldername(name))[2]) is not null
-    and split_part(name, '/', 3) <> ''
+    and cardinality(string_to_array(storage.objects.name, '/')) = 3
+    and cardinality(storage.foldername(storage.objects.name)) = 2
+    and (storage.foldername(storage.objects.name))[1] = 'tickets'
+    and public.safe_uuid((storage.foldername(storage.objects.name))[2]) is not null
+    and split_part(storage.objects.name, '/', 3) <> ''
     and exists (
         select 1 from public.support_tickets t
-        where t.id = public.safe_uuid((storage.foldername(name))[2])
+        where t.id = public.safe_uuid((storage.foldername(storage.objects.name))[2])
           and (
               t.customer_id = (select auth.uid())
               or (
