@@ -333,6 +333,30 @@ create table public.product_variants (
 );
 
 
+-- Product image metadata.
+-- Binary files are stored in the private Supabase Storage bucket.
+-- The store owner is derived through products.store_id.
+create table public.product_images (
+    id uuid primary key default gen_random_uuid(),
+    product_id uuid not null
+        references public.products(id) on delete restrict,
+    storage_path text not null unique,
+    is_primary boolean not null default false,
+    display_order integer not null default 0,
+    created_at timestamptz not null default now(),
+    constraint product_images_id_product_unique
+        unique (id, product_id)
+);
+
+-- At most one image can be the primary image for each product.
+create unique index product_images_one_primary_per_product_uq
+    on public.product_images(product_id)
+    where is_primary = true;
+
+
+
+
+
 -- The SRS requires variant products to have one or more variants.
 -- Deferred checks allow a product and its first variant to be inserted in
 -- the same transaction before the invariant is evaluated at commit time.

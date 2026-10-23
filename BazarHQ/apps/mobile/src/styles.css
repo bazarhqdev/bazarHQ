@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+@import '../../../packages/ui/src/theme.css';
+
+@source '../../../packages/ui/src';
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+body {
+  overscroll-behavior-y: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}

@@ -1,0 +1,118 @@
+/*
+ * BazarHQ design tokens (Tailwind v4 @theme) — shared by web and mobile.
+ * Deep navy + emerald on white and soft neutral surfaces.
+ * Text/background pairs used by components meet WCAG AA (4.5:1) for body text.
+ */
+@theme {
+  --font-sans: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Navy — primary actions, sidebar, headings */
+  --color-navy-50: #eef3f9;
+  --color-navy-100: #d8e2ef;
+  --color-navy-200: #b3c5de;
+  --color-navy-300: #849fc6;
+  --color-navy-400: #5677a8;
+  --color-navy-500: #3a5b8c;
+  --color-navy-600: #2a4570;
+  --color-navy-700: #1d3459;
+  --color-navy-800: #142744;
+  --color-navy-900: #0b1f3a;
+  --color-navy-950: #07152a;
+
+  /* Brand emerald — positive, storefront accent, success */
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+
+  /* Neutral surfaces */
+  --color-canvas: #f4f6f5;
+  --color-surface: #ffffff;
+  --color-line: #e3e8e6;
+  --color-line-strong: #cfd7d4;
+  --color-ink: #0f1d2e;
+  --color-ink-muted: #4b5a6b;
+  --color-ink-subtle: #6b7787;
+
+  /* Chart categorical slots (validated: light surface, CVD ΔE ≥ 23) */
+  --color-chart-1: #059669;
+  --color-chart-2: #6366f1;
+  --color-chart-grid: #e7ecea;
+
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgb(15 29 46 / 0.04), 0 1px 3px rgb(15 29 46 / 0.06);
+  --shadow-pop: 0 10px 30px -10px rgb(15 29 46 / 0.25), 0 4px 10px -4px rgb(15 29 46 / 0.1);
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-slide-up: slide-up 200ms ease-out;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes shimmer {
+    0% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.55;
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: var(--color-brand-200);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}

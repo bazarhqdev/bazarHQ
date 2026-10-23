@@ -1,0 +1,42 @@
+{
+  "name": "bazarhq",
+  "version": "0.2.0",
+  "private": true,
+  "description": "BazarHQ multi-merchant e-commerce SaaS (SRS V2.1): Next.js web (Customer, Merchant, Super Admin), Capacitor Android app, shared packages and Supabase Stage 1 database.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:web": "npm run dev -w @bazarhq/web",
+    "dev:mobile": "npm run dev -w @bazarhq/mobile",
+    "build:web": "npm run build -w @bazarhq/web",
+    "build:mobile": "npm run build -w @bazarhq/mobile",
+    "build": "npm run build:web && npm run build:mobile",
+    "start:web": "npm run start -w @bazarhq/web",
+    "preview:mobile": "npm run preview -w @bazarhq/mobile",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm run test && npm run build",
+    "verify:routes": "node scripts/verify-web-routes.mjs",
+    "e2e:web": "node scripts/e2e-web-flows.mjs",
+    "verify:mobile": "node scripts/verify-mobile-routes.mjs",
+    "cap:sync": "npm run cap:sync -w @bazarhq/mobile",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "format": "prettier --write \"apps/*/{app,components,lib,src}/**/*.{ts,tsx,css}\" \"apps/*/*.{ts,mjs}\" \"packages/*/src/**/*.{ts,tsx,css}\" \"packages/config/**/*.{mjs,json}\" \"scripts/*.mjs\"",
+    "format:check": "prettier --check \"apps/*/{app,components,lib,src}/**/*.{ts,tsx,css}\" \"apps/*/*.{ts,mjs}\" \"packages/*/src/**/*.{ts,tsx,css}\" \"packages/config/**/*.{mjs,json}\" \"scripts/*.mjs\"",
+    "report:verification": "node scripts/write-verification-report.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "playwright": "^1.64.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.23.15"
+  }
+}

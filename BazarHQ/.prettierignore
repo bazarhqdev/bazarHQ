@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+build
+coverage
+verification
+package-lock.json
+apps/mobile/android
+supabase
+docs
+*.sql
+*.docx
+*.png
+next-env.d.ts

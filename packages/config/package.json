@@ -1,0 +1,20 @@
+{
+  "name": "@bazarhq/config",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint/index.mjs",
+    "./typescript/base.json": "./typescript/tsconfig.base.json",
+    "./typescript/react.json": "./typescript/tsconfig.react.json"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.0.0",
+    "typescript-eslint": "^8.72.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.39.0"
+  }
+}

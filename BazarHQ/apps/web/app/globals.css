@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import '../../../packages/ui/src/theme.css';
+
+/* Shared component sources live outside this app. */
+@source '../../../packages/ui/src';
+@source '.';
