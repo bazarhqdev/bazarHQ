@@ -1,7 +1,9 @@
-
-# BazarHQ — local Supabase development configuration
-# Do not put production credentials or secret keys in this file.
-
+# BazarHQ — Supabase local development configuration.
+# Reference: https://supabase.com/docs/guides/local-development/cli/config
+#
+# No secret is written in this file. Values that must stay secret are read
+# from the environment with env(...) and set in supabase/.env (git-ignored) or
+# your CI secret store. See docs/database/BACKEND_SETUP.md.
 project_id = "bazarhq"
 
 [api]
@@ -11,43 +13,163 @@ schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
+[api.tls]
+enabled = false
+
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+# Starter storefront themes only (supabase/seed.sql). Creates no accounts.
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
 
 [studio]
 enabled = true
 port = 54323
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = true
+port = 54324
 
 [storage]
 enabled = true
+# Bucket-level limits are set per bucket in migration 002 (2 MB images, 5 MB evidence/attachments).
 file_size_limit = "5MiB"
 
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
+# Web (storefront, merchant, admin) and the Android OAuth return deep link (MOB-07).
 additional_redirect_urls = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000"
+  "http://localhost:3000/**",
+  "http://127.0.0.1:3000/**",
+  "https://bazarhq.com/**",
+  "https://*.bazarhq.com/**",
+  "bazarhq://auth/callback",
 ]
 jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
 enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+# AUTH-02 / frontend validation: at least 8 characters including a number.
+minimum_password_length = 8
+password_requirements = "letters_digits"
+
+[auth.rate_limit]
+email_sent = 30
+sms_sent = 30
+anonymous_users = 30
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30
+web3 = 30
 
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
+# FR-M-02 / FR-C-31: email verification before access.
 enable_confirmations = true
 secure_password_change = true
+max_frequency = "1m0s"
+otp_length = 6
+otp_expiry = 3600
 
 [auth.sms]
 enable_signup = false
 enable_confirmations = false
 
+[auth.mfa]
+max_enrolled_factors = 10
+
+# AUTH-09 / FR-SA-02: Super Admin TOTP.
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+
+# AUTH-04 / AUTH-14: role claim (app_role); suspended or deleted accounts get no token.
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"
+
+# AUTH-07 / FR-SA-02: lock after 5 consecutive failures for 15 minutes.
+[auth.hook.password_verification_attempt]
+enabled = true
+uri = "pg-functions://postgres/public/hook_password_verification_attempt"
+
+# FR-M-05 / FR-C-31: Google sign-in. Credentials come from the environment only.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+skip_nonce_check = false
+
 [edge_runtime]
 enabled = true
 policy = "per_worker"
 inspector_port = 8083
+deno_version = 2
 
+# Server-only settings for the Edge Functions. Set the values in supabase/.env
+# (local) or with `supabase secrets set` (hosted). Never in client env vars.
+[edge_runtime.secrets]
+APP_ENV = "env(APP_ENV)"
+ALLOWED_ORIGINS = "env(ALLOWED_ORIGINS)"
+PUBLIC_APP_URL = "env(PUBLIC_APP_URL)"
+PAYMENT_PROVIDER_MODE = "env(PAYMENT_PROVIDER_MODE)"
+PAYMENT_SIMULATOR_SECRET = "env(PAYMENT_SIMULATOR_SECRET)"
+CRON_SECRET = "env(CRON_SECRET)"
+CLIENT_IP_HEADER = "env(CLIENT_IP_HEADER)"
+CLIENT_IP_POSITION = "env(CLIENT_IP_POSITION)"
+FCM_PROJECT_ID = "env(FCM_PROJECT_ID)"
+FCM_CLIENT_EMAIL = "env(FCM_CLIENT_EMAIL)"
+FCM_PRIVATE_KEY = "env(FCM_PRIVATE_KEY)"
 
+# Functions callable without a user session authenticate the caller themselves
+# (guest checkout proves the order phone; webhooks verify the gateway signature;
+# the scheduler sends CRON_SECRET). Every other function keeps verify_jwt.
+[functions.create-order]
+verify_jwt = false
 
+[functions.create-payment-attempt]
+verify_jwt = false
+
+[functions.track-order]
+verify_jwt = false
+
+[functions.payment-webhook]
+verify_jwt = false
+
+[functions.admin-network-check]
+verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[analytics]
+enabled = true
+port = 54327
+backend = "postgres"

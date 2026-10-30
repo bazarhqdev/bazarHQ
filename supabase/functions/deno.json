@@ -1,0 +1,8 @@
+{
+  "fmt": { "lineWidth": 160, "singleQuote": true, "indentWidth": 2 },
+  "lint": { "rules": { "tags": ["recommended"] } },
+  "tasks": {
+    "check": "deno check */index.ts _shared/*.ts _shared/payments/*.ts",
+    "test": "deno test --allow-env _shared/"
+  }
+}

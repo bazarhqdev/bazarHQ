@@ -1,190 +1,188 @@
--- BazarHQ Stage 1: RLS/Storage catalog, grants, and helper behavior tests.
--- Catalog tests are not a substitute for separate JWT/RLS and Storage API tests.
--- Run only after migrations 001-004 have been applied to a disposable local DB.
+-- Catalog-level security contract: RLS coverage, least-privilege grants, function
+-- privileges, append-only guards, Storage buckets, Realtime and key constraints.
+-- Read-only checks against the migrated schema; rolled back.
 begin;
-select plan(49);
+select plan(46);
 
--- Create a real Auth subject and canonical profile whose role is Super Admin.
--- The transaction is rolled back at the end; no persistent account is created.
-create temporary table rls_test_super_admin_subject(id uuid primary key) on commit drop;
-with new_auth_user as (
-    insert into auth.users (
-        id, aud, role, email, encrypted_password, email_confirmed_at,
-        raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-    )
-    values (
-        gen_random_uuid(), 'authenticated', 'authenticated',
-        'rls-test-' || gen_random_uuid()::text || '@example.invalid',
-        '', now(), '{}'::jsonb, '{"full_name":"RLS Catalog Test Admin"}'::jsonb,
-        now(), now()
-    )
-    returning id
-)
-insert into pg_temp.rls_test_super_admin_subject(id)
-select id from new_auth_user;
-
-update public.profiles
-set role = 'super_admin', status = 'active'
-where id = (select id from pg_temp.rls_test_super_admin_subject);
-
-select set_config(
-    'request.jwt.claim.sub',
-    (select id::text from pg_temp.rls_test_super_admin_subject),
-    true
-);
-select set_config('request.jwt.claim.role', 'authenticated', true);
-
--- 1: all 23 core application tables have RLS enabled.
-select ok((
-    select count(*) = 23 and bool_and(c.relrowsecurity)
-    from pg_class c
-    join pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public'
-      and c.relname = any(array[
-        'profiles','themes','stores','categories','products','product_variants',
-        'product_images','orders','order_items','payment_configs','delivery_events',
-        'returns','refunds','support_tickets','ticket_messages','ticket_audit_log',
-        'inventory_movements','notifications','device_tokens','audit_logs',
-        'announcements','policies','customer_addresses'
-      ])
-), 'RLS is enabled on all 23 core application tables');
-
--- 2-22: direct table/column grants remain least-privilege.
-select ok(not has_table_privilege('anon','public.orders','INSERT'), 'anon cannot directly insert orders');
-select ok(not has_table_privilege('authenticated','public.orders','INSERT'), 'authenticated cannot directly insert orders');
-select ok(not has_table_privilege('authenticated','public.order_items','INSERT'), 'authenticated cannot directly insert order items');
-select ok(not has_table_privilege('authenticated','public.inventory_movements','INSERT'), 'authenticated cannot directly insert inventory movements');
-select ok(not has_table_privilege('authenticated','public.inventory_movements','UPDATE'), 'authenticated cannot update inventory movements');
-select ok(not has_table_privilege('authenticated','public.inventory_movements','DELETE'), 'authenticated cannot delete inventory movements');
-select ok(not has_table_privilege('authenticated','public.payment_configs','SELECT'), 'authenticated cannot select raw payment configuration');
-select ok(not has_table_privilege('anon','public.payment_configs','SELECT'), 'anon cannot select raw payment configuration');
-select ok(not has_table_privilege('authenticated','public.device_tokens','SELECT'), 'authenticated cannot select device tokens directly');
-select ok(not has_table_privilege('authenticated','public.audit_logs','SELECT'), 'authenticated cannot select audit logs directly, including as a Super Admin subject');
-select ok(not has_table_privilege('authenticated','public.profiles','INSERT'), 'authenticated cannot insert profiles directly');
-select ok(not has_column_privilege('authenticated','public.profiles','role','UPDATE'), 'authenticated cannot update profiles.role');
-select ok(not has_column_privilege('authenticated','public.profiles','status','UPDATE'), 'authenticated cannot update profiles.status');
-select ok(not has_column_privilege('authenticated','public.stores','status','UPDATE'), 'authenticated cannot publish or suspend stores directly');
-select ok(not has_column_privilege('authenticated','public.stores','owner_id','UPDATE'), 'authenticated cannot change store ownership');
-select ok(not has_table_privilege('authenticated','public.products','INSERT'), 'product creation is not directly granted');
-select ok(not has_table_privilege('authenticated','public.products','UPDATE'), 'product update is not directly granted');
-select ok(not has_table_privilege('authenticated','public.product_variants','UPDATE'), 'variant update/stock write is not directly granted');
-select ok(not has_table_privilege('authenticated','public.orders','UPDATE'), 'order/payment state updates are not directly granted');
-select ok(not has_table_privilege('authenticated','public.refunds','UPDATE'), 'refund settlement is not directly granted');
+-- ---------------------------------------------------------------- RLS coverage
+select is(
+  (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity),
+  0, 'every table in public has RLS enabled');
+select is(
+  (select count(*)::int from pg_policies where schemaname = 'public' and tablename = 'payment_configs'),
+  0, 'payment_configs has no client policy (deny all; safe projection via function)');
 select ok(
-    not has_table_privilege('anon','public.profiles','SELECT')
-    and not has_table_privilege('anon','public.orders','SELECT')
-    and not has_table_privilege('anon','public.order_items','SELECT')
-    and not has_table_privilege('anon','public.delivery_events','SELECT')
-    and not has_table_privilege('anon','public.returns','SELECT')
-    and not has_table_privilege('anon','public.refunds','SELECT')
-    and not has_table_privilege('anon','public.support_tickets','SELECT')
-    and not has_table_privilege('anon','public.ticket_messages','SELECT')
-    and not has_table_privilege('anon','public.ticket_audit_log','SELECT')
-    and not has_table_privilege('anon','public.notifications','SELECT')
-    and not has_table_privilege('anon','public.customer_addresses','SELECT'),
-    'anon has no direct SELECT grants on private customer/order/support resources');
+  (select bool_and(n > 0) from (
+     select t, (select count(*) from pg_policies p where p.schemaname = 'public' and p.tablename = t) n
+     from unnest(array['profiles','themes','stores','categories','products','product_variants','product_images','orders',
+                       'order_items','payment_transactions','delivery_events','returns','refunds','support_tickets',
+                       'ticket_messages','ticket_audit_log','inventory_movements','notifications','device_tokens','audit_logs',
+                       'announcements','policies','customer_addresses']) t) x),
+  'every client-readable table has at least one explicit policy');
 
--- 23-25: direct RLS policies must not grant Super Admin privilege by role alone.
-select ok(not exists (
-    select 1 from pg_policies
-    where schemaname = 'public'
-      and tablename <> 'payment_transactions'
-      and (coalesce(qual,'') || ' ' || coalesce(with_check,'')) ~* 'is_super_admin|can_access_ticket'
-), 'core-table policies do not use privileged Super Admin/ticket helpers');
-select ok(not exists (
-    select 1 from pg_policies
-    where schemaname = 'storage' and tablename = 'objects'
-      and (coalesce(qual,'') || ' ' || coalesce(with_check,'')) ~* 'is_super_admin|can_access_ticket'
-), 'Storage policies do not use Super Admin/ticket helpers');
-select ok(not exists (
-    select 1 from pg_policies
-    where schemaname = 'public' and tablename <> 'payment_transactions'
-      and (coalesce(qual,'') || ' ' || coalesce(with_check,'')) ilike '%current_app_role%'
-), 'core RLS policies use the active-role helper rather than stale role helper');
+-- ---------------------------------------------------------------- anon grants
+select is(
+  (select count(*)::int from information_schema.role_table_grants
+   where grantee = 'anon' and table_schema = 'public' and privilege_type in ('INSERT','UPDATE','DELETE','TRUNCATE')),
+  0, 'anon has no table-level write privilege on any public table');
+select is(
+  (select count(*)::int from information_schema.column_privileges
+   where grantee = 'anon' and table_schema = 'public' and privilege_type in ('INSERT','UPDATE')),
+  0, 'anon has no column-level write privilege on any public table');
+select ok(not has_table_privilege('anon', 'public.orders', 'SELECT'), 'anon cannot read orders directly (tracking uses a server endpoint)');
+select ok(not has_table_privilege('anon', 'public.customer_addresses', 'SELECT'), 'anon cannot read saved addresses');
+select ok(not has_table_privilege('anon', 'public.profiles', 'SELECT'), 'anon cannot read profiles');
 
--- 26-33: missing-helper contract, active ownership, and actual Super Admin subject behavior.
+-- ---------------------------------------------------------------- authenticated grants
 select ok(
-    not has_function_privilege(
-        'anon',
-        'public.can_access_ticket(uuid)',
-        'EXECUTE'
-    )
-    and not has_function_privilege(
-        'authenticated',
-        'public.can_access_ticket(uuid)',
-        'EXECUTE'
-    )
-    and not has_function_privilege(
-        'service_role',
-        'public.can_access_ticket(uuid)',
-        'EXECUTE'
-    ),
-    'unused ticket helper is not executable by client or service roles'
-);
-select ok(to_regprocedure('public.current_app_role()') is null, 'unused current_app_role helper is absent from the migration prerequisite contract');
-select ok(to_regprocedure('public.current_store_id()') is null, 'unused current_store_id helper is absent from the migration prerequisite contract');
-select ok(to_regprocedure('public.owns_order(uuid)') is null, 'unused owns_order helper is absent from the migration prerequisite contract');
-select is(public.is_super_admin(), false, 'is_super_admin fails closed for an actual active Super Admin subject using an authenticated client JWT');
-select ok(position('merchant' in pg_get_functiondef('public.owns_store(uuid)'::regprocedure)) > 0
-          and position('active' in pg_get_functiondef('public.owns_store(uuid)'::regprocedure)) > 0,
-          'owns_store requires active Merchant ownership');
-select ok(exists (
-    select 1 from pg_policies
-    where schemaname = 'public' and tablename = 'payment_transactions'
-      and policyname = 'payment_transactions_read_authorized'
-      and coalesce(qual,'') ilike '%is_super_admin%'
-), 'legacy payment policy remains compatible; its helper fails closed for direct client JWTs');
+  (select bool_and(not has_table_privilege('authenticated', 'public.' || t, p))
+   from unnest(array['orders','order_items','payment_transactions','payment_configs','delivery_events','inventory_movements',
+                     'audit_logs','ticket_audit_log','ticket_messages','refunds','returns','support_tickets','products',
+                     'product_variants','policies','announcements','themes','device_tokens']) t,
+        unnest(array['INSERT','UPDATE','DELETE','TRUNCATE']) p),
+  'authenticated has no direct writes on workflow, financial, catalogue-stock or audit tables');
+select ok(
+  (select bool_and(not has_column_privilege('authenticated', 'public.' || t, c, 'UPDATE'))
+   from (values ('products','stock_quantity'),('product_variants','stock_quantity'),('orders','status'),('orders','payment_status'),
+                ('stores','status'),('stores','owner_id'),('profiles','role'),('profiles','status'),('notifications','user_id'),
+                ('notifications','reference_id'),('payment_transactions','status')) v(t, c)),
+  'authenticated cannot update role, status, stock, payment state or notification targets');
+select ok(has_column_privilege('authenticated', 'public.profiles', 'full_name', 'UPDATE')
+          and has_column_privilege('authenticated', 'public.notifications', 'is_read', 'UPDATE'),
+          'authenticated may edit own non-role profile fields and mark notifications read');
+select ok(not has_column_privilege('authenticated', 'public.device_tokens', 'token', 'SELECT'),
+          'raw FCM tokens are not selectable by clients');
 
--- 34-38: catalogue and direct-client privacy policy checks.
-select ok(exists (select 1 from pg_policies where schemaname='public' and tablename='stores' and policyname='stores_select_published_or_own_merchant' and cmd='SELECT'), 'store policy allows published stores and authorized owner reads');
-select ok(exists (
-    select 1 from pg_policies
-    where schemaname='public' and tablename='product_variants'
-      and policyname='variants_select_active_published_or_own_store'
-      and coalesce(qual,'') ilike '%active%'
-      and coalesce(qual,'') ilike '%published%'
-      and coalesce(qual,'') ilike '%owns_store%'
-), 'variant policy restricts public reads to active variants of published products/stores while retaining owner access');
-select ok(not exists (select 1 from pg_policies where schemaname='public' and tablename='audit_logs' and cmd='SELECT' and roles && array['anon','authenticated']::name[]), 'no direct client audit-log SELECT policy exists');
-select ok(not exists (select 1 from pg_policies where schemaname='public' and tablename='payment_configs' and roles && array['anon','authenticated']::name[] and cmd in ('SELECT','ALL')), 'no direct client payment-config SELECT policy exists');
-select ok(not has_function_privilege('anon','public.is_super_admin()','EXECUTE'), 'anon has no execute privilege on the Super Admin helper');
+-- ---------------------------------------------------------------- service_role is not a bypass for history/state tables
+select ok(
+  (select bool_and(not has_table_privilege('service_role', 'public.' || t, p))
+   from unnest(array['orders','order_items','payment_transactions','delivery_events','inventory_movements','audit_logs',
+                     'ticket_audit_log','refunds','returns','products','product_variants']) t,
+        unnest(array['INSERT','UPDATE','DELETE']) p),
+  'service_role has no direct DML on order, payment, stock, refund and audit tables (trusted functions only)');
 
--- 39-43: all five approved Storage buckets are private and have their expected policy families.
-select is((select count(*)::integer from storage.buckets where id = any(array['product-images','store-logos','delivery-evidence','return-evidence','support-attachments']) and public = false), 5, 'all five approved Storage buckets exist and are private');
-select ok((select count(*) = 3 from pg_policies where schemaname='storage' and tablename='objects' and policyname = any(array['product_images_storage_select_published_or_own','product_images_storage_insert_own_product','product_images_storage_delete_own_product'])), 'product-images has the expected SELECT/INSERT/DELETE policy family');
-select ok((select count(*) = 3 from pg_policies where schemaname='storage' and tablename='objects' and policyname = any(array['store_logos_storage_select_published_or_own','store_logos_storage_insert_own','store_logos_storage_delete_unreferenced_own'])), 'store-logos has the expected SELECT/INSERT/DELETE policy family');
-select ok((select count(*) = 2 from pg_policies where schemaname='storage' and tablename='objects' and policyname = any(array['delivery_evidence_storage_select_participant','delivery_evidence_storage_insert_own_merchant_order'])), 'delivery-evidence has the expected private SELECT/INSERT policy family');
-select ok((select count(*) = 2 from pg_policies where schemaname='storage' and tablename='objects' and policyname = any(array['return_evidence_storage_select_participant','return_evidence_storage_insert_own_return'])), 'return-evidence has the expected private SELECT/INSERT policy family');
-select ok((select count(*) = 2 from pg_policies where schemaname='storage' and tablename='objects' and policyname = any(array['support_attachments_storage_select_participant','support_attachments_storage_insert_participant'])), 'support-attachments has the expected private SELECT/INSERT policy family');
+-- ---------------------------------------------------------------- function privileges
+select is(
+  (select array_agg(p.proname::text order by p.proname)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prosecdef and has_function_privilege('anon', p.oid, 'EXECUTE')
+     and p.proname not in ('is_super_admin','owns_store','owns_product','owns_order','can_read_order','can_read_return',
+                           'can_access_ticket','current_active_app_role','current_store_id','is_merchant','is_customer',
+                           'resolve_store','search_stores','validate_cart',
+                           'record_storefront_visit', 'storefront_product_popularity')),
+  null::text[], 'anon can execute only the RLS helpers and public storefront functions');
+select is(
+  (select array_agg(f order by f) from unnest(array[
+     'create_order','transition_order_status','record_cod_collection','submit_wallet_reference','apply_payment_result',
+     'create_payment_attempt','record_payment_transaction_state','adjust_inventory','request_return','decide_return',
+     'confirm_return_receipt','create_refund','update_refund_status','admin_intervene_refund','admin_set_merchant_status',
+     'admin_delete_merchant','admin_submit_policy','admin_approve_policy','admin_publish_policy','admin_save_theme',
+     'admin_delete_theme','admin_save_announcement','store_payment_credentials','get_payment_credentials','track_order',
+     'register_device_token','claim_pending_push_notifications','consume_rate_limit','get_actor_context',
+     'prepare_sslcommerz_payment','escalate_return','admin_resolve_return_dispute']) f
+   where exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                 where n.nspname = 'public' and p.proname = f and has_function_privilege('authenticated', p.oid, 'EXECUTE'))),
+  null::text[], 'trusted server operations are not executable with a user JWT');
+select ok(
+  (select bool_and(exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                           where n.nspname = 'public' and p.proname = f and has_function_privilege('service_role', p.oid, 'EXECUTE')))
+   from unnest(array['create_order','transition_order_status','record_cod_collection','apply_payment_result','adjust_inventory',
+                     'request_return','create_refund','admin_set_merchant_status','track_order','register_device_token']) f),
+  'service_role (Edge Functions) can execute the trusted operations');
+select is(
+  (select array_agg(n.nspname || '.' || p.proname order by 1)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname in ('public','private') and p.prosecdef
+     and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')),
+  null::text[], 'every SECURITY DEFINER function pins search_path');
+select ok(has_function_privilege('supabase_auth_admin', 'public.custom_access_token_hook(jsonb)', 'EXECUTE')
+          and not has_function_privilege('authenticated', 'public.custom_access_token_hook(jsonb)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.hook_password_verification_attempt(jsonb)', 'EXECUTE'),
+          'auth hooks are callable by Supabase Auth only');
+select ok(not has_schema_privilege('anon', 'private', 'USAGE') and not has_schema_privilege('authenticated', 'private', 'USAGE'),
+          'the private schema is not reachable by client roles');
+select ok(not has_function_privilege('service_role', 'private.grant_super_admin(uuid,text)', 'EXECUTE')
+          and not has_function_privilege('authenticated', 'private.grant_super_admin(uuid,text)', 'EXECUTE'),
+          'Super Admin elevation is a project-owner SQL procedure only');
 
--- 44-49: deletion order, safe parsing, and policy/helper linkage.
-select ok(exists (
-    select 1 from pg_policies
-    where schemaname='storage' and tablename='objects'
-      and policyname='product_images_storage_delete_own_product'
-      and coalesce(qual,'') ilike '%owns_store%'
-      and coalesce(qual,'') ilike '%safe_uuid%'
-      and coalesce(qual,'') ilike '%product_images%'
-), 'product-image object deletion validates the owning product and existing metadata row');
-select ok(exists (
-    select 1 from pg_policies
-    where schemaname='public' and tablename='product_images'
-      and policyname='product_images_delete_own_product_after_object'
-      and coalesce(qual,'') ilike '%storage.objects%'
-), 'product-image metadata deletion policy checks Storage-object absence');
-select ok(not exists (
-    select 1 from pg_policies
-    where schemaname='storage' and tablename='objects'
-      and policyname='product_images_storage_delete_own_product'
-      and coalesce(qual,'') ilike '%not exists%product_images%'
-), 'Storage object deletion does not require metadata to be absent');
-select is(public.safe_uuid('not-a-valid-uuid'), null::uuid, 'malformed Storage UUID safely parses to NULL');
-select ok(public.safe_uuid('00000000-0000-0000-0000-000000000001') is not null, 'valid UUID text parses successfully');
-select ok(not exists (
-    select 1 from pg_policies
-    where (schemaname='public' or schemaname='storage')
-      and (coalesce(qual,'') || ' ' || coalesce(with_check,'')) ilike '%can_access_ticket%'
-), 'current RLS policy design does not call the legacy ticket helper');
+-- ---------------------------------------------------------------- append-only guards
+select ok(
+  (select bool_and(exists (select 1 from pg_trigger tg where tg.tgrelid = ('public.' || t)::regclass and not tg.tgisinternal
+                           and tg.tgfoid = 'public.prevent_append_only_mutation()'::regprocedure))
+   from unnest(array['audit_logs','ticket_audit_log','delivery_events','inventory_movements','order_items','ticket_messages']) t),
+  'append-only tables carry the UPDATE/DELETE guard trigger');
+select ok(
+  (select bool_and(not exists (select 1 from information_schema.columns c where c.table_schema = 'public' and c.table_name = t
+                               and c.column_name = 'updated_at'))
+   from unnest(array['audit_logs','ticket_audit_log','delivery_events','inventory_movements','order_items','ticket_messages']) t),
+  'append-only tables have no mutable updated_at');
+select ok(
+  (select bool_and(exists (select 1 from information_schema.columns c where c.table_schema = 'public' and c.table_name = t and c.column_name = 'updated_at')
+               and exists (select 1 from information_schema.columns c where c.table_schema = 'public' and c.table_name = t and c.column_name = 'created_at')
+               and exists (select 1 from pg_trigger tg where tg.tgrelid = ('public.' || t)::regclass and not tg.tgisinternal
+                           and tg.tgfoid = 'public.set_updated_at()'::regprocedure))
+   from unnest(array['profiles','themes','stores','categories','products','product_variants','product_images','orders',
+                     'payment_configs','returns','refunds','support_tickets','announcements','policies','customer_addresses']) t),
+  'mutable business tables have created_at, updated_at and the timestamp trigger');
+select has_trigger('public', 'refunds', 'refunds_guard_row', 'refund immutability guard exists');
+select has_trigger('public', 'payment_transactions', 'payment_transactions_guard_update_trg', 'payment immutability guard exists (003)');
+
+-- ---------------------------------------------------------------- constraints
+select ok(
+  (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.orders'::regclass and conname = 'orders_status_check')
+   ~ 'pending.*confirmed.*processing.*shipped.*out_for_delivery.*delivered.*cancelled',
+  'orders.status is limited to the seven canonical statuses');
+select ok(
+  (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.orders'::regclass and conname = 'orders_payment_status_check')
+   ~ 'pending_verification.*paid.*failed.*cod_pending.*cod_collected.*refunded',
+  'orders.payment_status is limited to the canonical payment statuses');
+select ok(
+  (select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.refunds'::regclass and conname = 'refunds_status_check')
+   ~ 'initiated.*processing.*completed.*failed',
+  'refunds.status is limited to the canonical refund statuses');
+select col_is_unique('public', 'stores', array['owner_id'], 'one store per merchant');
+select col_is_unique('public', 'stores', array['subdomain'], 'store subdomains are unique');
+select col_is_unique('public', 'returns', array['order_id'], 'one return per order');
+select col_is_unique('public', 'refunds', array['return_id'], 'one refund per return');
+select has_index('public', 'products', 'products_store_sku_uq', 'SKU is unique per store');
+select has_index('public', 'orders', 'orders_store_idempotency_uq', 'order idempotency key is unique per store');
+select has_index('public', 'orders', 'orders_order_number_uq', 'public order numbers are unique');
+select is((select confdeltype::text from pg_constraint where conrelid = 'public.order_items'::regclass and conname = 'order_items_order_id_fkey'),
+          'r', 'order_items keep history: ON DELETE RESTRICT to orders (DB-06)');
+select is((select confdeltype::text from pg_constraint where conrelid = 'public.product_images'::regclass and conname = 'product_images_product_id_fkey'),
+          'c', 'product_images cascade with their product (DB-06)');
+select ok(exists (select 1 from pg_constraint where conrelid = 'public.stores'::regclass and conname = 'stores_subdomain_not_reserved_check'),
+          'reserved subdomains are rejected by the database');
+select ok(exists (select 1 from pg_constraint where conrelid = 'public.orders'::regclass and conname = 'orders_amounts_check'),
+          'order total = subtotal + delivery charge');
+
+-- ---------------------------------------------------------------- Storage
+select is((select count(*)::int from storage.buckets
+           where id in ('product-images','store-logos','delivery-evidence','return-evidence','support-attachments','profile-images')
+             and public = false),
+          6, 'six private buckets exist (no public object URLs)');
+select ok((select bool_and(file_size_limit is not null and allowed_mime_types is not null) from storage.buckets),
+          'every bucket enforces a size limit and a MIME allowlist');
+select is((select allowed_mime_types from storage.buckets where id = 'support-attachments'),
+          array['image/jpeg','image/png','application/pdf'], 'support attachments: JPG/PNG/PDF only (FR-SUP-01)');
+select is((select file_size_limit from storage.buckets where id = 'product-images'), 2097152::bigint,
+          'product images are capped at 2 MB (FR-M-16)');
+select ok(
+  (select bool_and(exists (select 1 from pg_policies p where p.schemaname = 'storage' and p.tablename = 'objects'
+                           and p.cmd = 'INSERT' and p.qual is null and p.with_check like '%' || b || '%'))
+   from unnest(array['product-images','store-logos','delivery-evidence','return-evidence','support-attachments','profile-images']) b),
+  'each bucket has an explicit, path-scoped INSERT policy');
+select is(
+  (select count(*)::int from pg_policies where schemaname = 'storage' and tablename = 'objects' and cmd in ('UPDATE','DELETE')
+     and (qual like '%delivery-evidence%' or qual like '%return-evidence%' or qual like '%support-attachments%')),
+  0, 'evidence and attachment objects cannot be updated or deleted by clients');
+
+-- ---------------------------------------------------------------- Realtime
+select ok(
+  (select count(*) = 4 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'
+     and tablename in ('orders','notifications','support_tickets','delivery_events')),
+  'Realtime publishes orders, delivery events, notifications and tickets (RLS-filtered)');
 
 select * from finish();
 rollback;

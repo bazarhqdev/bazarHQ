@@ -1,0 +1,1 @@
+Source: https://github.com/supabase/postgres @ 920bb634698fef8dee6e78d738330d2dd8e489c5 (migrations/db). PostgreSQL License — see LICENSE.
