@@ -63,7 +63,7 @@ function ipAllowed(ip: string | null): boolean {
   });
 }
 
-const DATA_SOURCE = process.env.NEXT_PUBLIC_DATA_SOURCE ?? 'mock';
+const DATA_SOURCE = process.env.NEXT_PUBLIC_DATA_SOURCE ?? (isProd ? '' : 'mock');
 type Role = 'customer' | 'merchant' | 'super_admin';
 
 const PROTECTED: { prefix: RegExp; role: Role; login: string }[] = [
@@ -130,6 +130,12 @@ function withHeaders(res: NextResponse, admin: boolean): NextResponse {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const admin = pathname === '/admin' || pathname.startsWith('/admin/');
+
+  // Production must never run with the mock adapter or an unset/unknown
+  // data-source setting. Fail closed before serving any application route.
+  if (isProd && DATA_SOURCE !== 'supabase') {
+    return withHeaders(new NextResponse('BazarHQ is temporarily unavailable because production data access is not configured.', { status: 503 }), admin);
+  }
 
   if (admin && !ipAllowed(clientIp(req))) {
     const body = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Access restricted · BazarHQ</title><body style="font-family:system-ui,sans-serif;background:#f4f6f5;color:#0f1d2e;display:grid;place-items:center;min-height:100vh;margin:0"><main style="max-width:28rem;padding:2rem;text-align:center"><h1 style="font-size:1.25rem">Access restricted</h1><p style="color:#4b5a6b">The BazarHQ admin console is only available from the approved office network or VPN.</p></main></body></html>`;

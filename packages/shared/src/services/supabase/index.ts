@@ -1,49 +1,20 @@
 /**
- * Supabase integration seam.
- *
- * Not implemented in this phase (mock data first). This module documents
- * exactly where each PlatformServices call goes so the adapter can be added
- * without touching UI code, and it guards against the most damaging
- * misconfiguration: shipping a service-role key to a client.
+ * Supabase-backed implementation of the shared PlatformServices contract.
+ * All browser calls use the public anon/publishable key and are scoped by RLS.
+ * Privileged writes are delegated to the project's Edge Functions.
  */
-import { ServiceError, type PlatformServices } from '../contracts';
+import type { PlatformServices } from '../contracts';
+import { createAdapterContext, type SupabaseClientConfig } from './core';
+import { createAuth } from './auth';
+import { createMerchant } from './merchant';
+import { createCustomer } from './customer';
+import { createAdmin } from './admin';
+import { createNotifications } from './notifications';
+import { createStorefront } from './storefront';
 
-export interface SupabaseClientConfig {
-  url: string;
-  /** Public anon key ONLY. Never the service-role key (§5.2, MOB-11). */
-  anonKey: string;
-  /**
-   * Where supabase-js keeps the session. Android passes the Keystore-backed
-   * vault so tokens never sit in localStorage/Preferences (AUTH-05, MOB-05);
-   * the web uses supabase-js defaults with httpOnly cookie sessions planned for SSR.
-   */
-  authStorage?: { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<void>; removeItem(key: string): Promise<void> };
-}
+export { assertPublicAnonKey } from './core';
+export type { SupabaseClientConfig } from './core';
 
-/**
- * Rejects keys whose JWT payload says role=service_role. A cheap last line of
- * defence; the real control is never putting the key in client env vars.
- */
-export function assertPublicAnonKey(key: string): void {
-  const parts = key.split('.');
-  if (parts.length !== 3) return; // new-style publishable keys are not JWTs
-  try {
-    const json = typeof atob === 'function' ? atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/')) : '';
-    const payload = JSON.parse(json) as { role?: string };
-    // eslint-disable-next-line no-restricted-syntax -- this guard detects (never holds) a service-role key
-    if (payload.role === 'service_role') {
-      throw new ServiceError('FORBIDDEN', 'Refusing to start: a service-role key was supplied to a client build.');
-    }
-  } catch (e) {
-    if (e instanceof ServiceError) throw e;
-  }
-}
-
-/**
- * Operation → backend mapping (SRS §17.1 API IDs, §18 tables, RLS matrix).
- * "EF" = Supabase Edge Function / trusted server route; "RLS" = direct
- * PostgREST read allowed by RLS for the merchant's own store.
- */
 export const SUPABASE_OPERATION_MAP = {
   'auth.signIn': 'supabase.auth.signInWithPassword; lockout/rate limit enforced server-side (AUTH-07)',
   'auth.register': 'API-01 POST /auth/register → supabase.auth.signUp; role set server-side (AUTHZ-01)',
@@ -112,10 +83,31 @@ export const SUPABASE_OPERATION_MAP = {
   'admin.listAuditLogs': 'RLS select audit_logs (super_admin only, append-only)',
 } as const;
 
+/**
+ * Compose the existing role-specific modules into the one service contract
+ * consumed by the web and mobile applications.
+ */
 export function createSupabaseServices(config: SupabaseClientConfig): PlatformServices {
-  assertPublicAnonKey(config.anonKey);
-  throw new ServiceError(
-    'UNKNOWN',
-    'The Supabase adapter is not implemented yet. Set NEXT_PUBLIC_DATA_SOURCE / VITE_DATA_SOURCE to "mock".',
-  );
+  const ctx = createAdapterContext(config);
+  const auth = createAuth(ctx);
+  const merchant = createMerchant(ctx, auth);
+  const customer = createCustomer(ctx, auth, merchant);
+  const admin = createAdmin(ctx, auth, merchant);
+  const notifications = createNotifications(ctx, auth);
+  const storefront = createStorefront(ctx);
+
+  // createMerchant intentionally leaves notifications unbound because the
+  // Realtime/device-token implementation is composed separately below.
+  const services: PlatformServices = {
+    ...merchant.services,
+    auth: auth.auth,
+    notifications: notifications.service,
+    storefront: storefront.storefront,
+    checkout: storefront.checkout,
+    account: customer,
+    adminAuth: auth.adminAuth,
+    admin,
+  };
+
+  return services;
 }
