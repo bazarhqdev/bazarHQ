@@ -89,11 +89,12 @@ function sessionRole(req: NextRequest): { role: Role | null; aal: string | null 
     if (raw.startsWith('base64-')) raw = atob(raw.slice(7));
     const token = (JSON.parse(raw) as { access_token?: string }).access_token ?? '';
     const payload = JSON.parse(atob(token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as {
+      app_role?: Role;
       app_metadata?: { role?: Role };
       user_role?: Role;
       aal?: string;
     };
-    return { role: payload.app_metadata?.role ?? payload.user_role ?? null, aal: payload.aal ?? null };
+    return { role: payload.app_role ?? payload.app_metadata?.role ?? payload.user_role ?? null, aal: payload.aal ?? null };
   } catch {
     return { role: null, aal: null };
   }

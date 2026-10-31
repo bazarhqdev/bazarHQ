@@ -1,6 +1,7 @@
 'use client';
 
 import { createMockServices, createSupabaseServices, type PlatformServices, type MockPlatformServices } from '@bazarhq/shared';
+import { cookieAuthStorage } from './cookie-storage';
 
 let instance: PlatformServices | null = null;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -19,7 +20,7 @@ export function getServices(): PlatformServices {
       throw new Error('BazarHQ is not configured: production Supabase URL and publishable key are required.');
     }
 
-    instance = createSupabaseServices({ url, anonKey });
+    instance = createSupabaseServices({ url, anonKey, authStorage: cookieAuthStorage });
     return instance;
   }
 
