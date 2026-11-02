@@ -113,7 +113,7 @@ reset role;
 select is((select count(*)::int from auth.sessions where user_id = '21000000-0000-4000-8000-0000000000c1'), 1,
           'the revoked session is gone');
 
--- Super Admin (AAL2 + allowlisted network) can count; suspension ends sessions.
+-- Super Admin (AAL2) can count from any network; suspension ends sessions.
 select set_config('request.jwt.claims', '{"sub":"31000000-0000-4000-8000-0000000000d1","role":"authenticated","aal":"aal2"}', true);
 select set_config('request.headers', '{"x-forwarded-for":"198.51.100.7"}', true);
 set local role authenticated;

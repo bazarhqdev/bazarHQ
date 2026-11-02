@@ -218,7 +218,7 @@ select is((select count(*)::int from storage.objects where bucket_id = 'return-e
           'another customer cannot read someone else''s return evidence');
 reset role;
 
--- ================================================================ Super Admin gate (aal2 + allowlisted network)
+-- ================================================================ Super Admin gate (AAL2 + active role; no IP allowlist)
 select set_config('request.jwt.claims', '{"sub":"30000000-0000-4000-8000-0000000000d1","role":"authenticated","aal":"aal1"}', true);
 select set_config('request.headers', '{"x-forwarded-for":"203.0.113.10"}', true);
 set local role authenticated;
@@ -227,11 +227,11 @@ reset role;
 select set_config('request.jwt.claims', '{"sub":"30000000-0000-4000-8000-0000000000d1","role":"authenticated","aal":"aal2"}', true);
 select set_config('request.headers', '{"x-forwarded-for":"198.51.100.7"}', true);
 set local role authenticated;
-select is((select count(*)::int from public.orders), 0, 'Super Admin from a non-allowlisted network gets no privileged reads');
+select is((select count(*)::int from public.orders), 4, 'AAL2 Super Admin can read privileged rows regardless of request IP');
 reset role;
 select set_config('request.headers', '{"x-forwarded-for":"198.51.100.7, 203.0.113.10"}', true);
 set local role authenticated;
-select is((select count(*)::int from public.orders), 4, 'Super Admin (aal2, allowlisted network) can read all orders');
+select is((select count(*)::int from public.orders), 4, 'AAL2 Super Admin retains privileged reads on any network');
 select ok((select count(*) from public.audit_logs) > 0, 'Super Admin can read the audit log');
 select throws_ok($$update public.orders set status = 'confirmed' where id = '80000000-0000-4000-8000-000000000002'$$,
                  '42501', null, 'Super Admin has no direct order-status write path');
@@ -240,7 +240,7 @@ select throws_ok($$delete from public.audit_logs$$, '42501', null, 'Super Admin 
 reset role;
 select set_config('request.headers', '{"x-forwarded-for":"203.0.113.10, 198.51.100.7"}', true);
 set local role authenticated;
-select is((select count(*)::int from public.orders), 0, 'a spoofed left-most X-Forwarded-For entry is ignored (proxy-appended hop is used)');
+select is((select count(*)::int from public.orders), 4, 'forwarding headers do not affect Super Admin RLS authorization');
 reset role;
 select set_config('request.headers', '', true);
 

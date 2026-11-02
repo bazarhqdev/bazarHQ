@@ -8,7 +8,7 @@
  *  - Lockout (AUTH-07) and suspension (AUTH-14) are enforced by the Auth hooks
  *    in migration 006; their messages are mapped to LOCKED / SUSPENDED here.
  *  - Super Admins sign in only through AdminAuthService: password, then TOTP
- *    (AAL2), from an allowlisted network, with a 30-minute idle limit.
+ *    (AAL2), with a 30-minute idle limit.
  */
 import type { User as SbUser } from '@supabase/supabase-js';
 import { ADMIN_LIMITS } from '../../constants';
@@ -122,13 +122,7 @@ export function createAuth(ctx: AdapterContext) {
     return mapStore(row, { logo: urls.get(row.logo_url as string) ?? null, banner: urls.get(row.banner_url as string) ?? null });
   }
 
-  let networkCache: { allowed: boolean; ip: string; at: number } | null = null;
-  async function checkNetwork(force = false): Promise<{ allowed: boolean; ip: string }> {
-    if (!force && networkCache && Date.now() - networkCache.at < 5 * 60_000) return networkCache;
-    const r = await ctx.invoke<{ allowed: boolean; ip: string }>('admin-network-check', {});
-    networkCache = { ...r, at: Date.now() };
-    return r;
-  }
+
 
   function adminActivity(): number {
     return readJson<number>(ADMIN_ACTIVITY_KEY) ?? 0;
@@ -212,10 +206,9 @@ export function createAuth(ctx: AdapterContext) {
         if (opts.requireAdminReady) throw new ServiceError('UNAUTHENTICATED', 'Your admin session expired after 30 minutes of inactivity. Sign in again.');
         return null;
       }
-      const network = mfaVerified ? await checkNetwork().catch(() => ({ allowed: false, ip: 'unknown' })) : { allowed: false, ip: 'unknown' };
-      session.admin = { mfaVerified, networkAllowed: network.allowed, idleExpiresAt, ip: network.ip };
-      // Like the mock: an admin session only counts once TOTP is done on the approved network.
-      if (!mfaVerified || !network.allowed) return null;
+      // Keep legacy session metadata compatible; network is not an authorization factor.
+      session.admin = { mfaVerified, networkAllowed: true, idleExpiresAt, ip: null };
+      if (!mfaVerified) return null;
     }
     cache = { token: sbSession.access_token, at: Date.now(), session };
     return session;
@@ -240,7 +233,7 @@ export function createAuth(ctx: AdapterContext) {
         throw mapped;
       }
       const user = await accountUser(data.user);
-      // Super Admins must use the admin sign-in (allowlist + TOTP, §12.1).
+      // Super Admins must use the dedicated admin sign-in (password + TOTP, §12.1).
       if (!user || user.role === 'super_admin' || user.status === 'deleted') {
         await sb.auth.signOut({ scope: 'local' });
         throw new ServiceError('UNAUTHENTICATED', GENERIC_LOGIN);
@@ -336,7 +329,6 @@ export function createAuth(ctx: AdapterContext) {
     async signOut() {
       writeJson(PENDING_KEY, null);
       writeJson(ADMIN_ACTIVITY_KEY, null);
-      networkCache = null;
       await sb.auth.signOut({ scope: 'local' });
     },
 
@@ -440,11 +432,7 @@ export function createAuth(ctx: AdapterContext) {
   };
 
   const adminAuth: AdminAuthService = {
-    checkNetwork: () => checkNetwork(true),
-
     async signIn(email, password) {
-      const net = await checkNetwork(true);
-      if (!net.allowed) throw new ServiceError('FORBIDDEN', 'Super Admin access is only allowed from the approved network or VPN.');
       const { data, error } = await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error) throw authError(error);
       const profile = await profileOf(data.user.id);
@@ -468,7 +456,7 @@ export function createAuth(ctx: AdapterContext) {
       if (error) throw new ServiceError('VALIDATION', 'That code is not valid. Check your authenticator app and try again.', { code: 'Invalid code.' });
       writeJson(ADMIN_ACTIVITY_KEY, Date.now());
       const s = await buildSession({ requireAdminReady: true });
-      if (!s) throw new ServiceError('FORBIDDEN', 'Super Admin access is only allowed from the approved network or VPN.');
+      if (!s) throw new ServiceError('FORBIDDEN', 'TOTP verification did not establish an AAL2 Super Admin session. Sign in again and retry.');
       return s;
     },
 

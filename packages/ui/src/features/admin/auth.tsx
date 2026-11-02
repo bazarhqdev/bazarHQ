@@ -1,17 +1,15 @@
 'use client';
 
 /**
- * Super Admin access (SRS §12.1, FR-SA-01..03): approved network → email +
- * password → TOTP, with a 30-minute idle timeout. The network and idle checks
- * are enforced server-side (edge allowlist + AAL2 session); this UI mirrors
- * them so the admin understands what is happening.
+ * Super Admin access: email + password -> TOTP, with a 30-minute idle timeout.
+ * The server requires an active Super Admin account and an AAL2 session.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { KeyRound, LoaderCircle, LockKeyhole, ShieldCheck, ShieldX, Wifi, WifiOff } from 'lucide-react';
+import { KeyRound, LoaderCircle, LockKeyhole, ShieldCheck, ShieldX } from 'lucide-react';
 import { ADMIN_LIMITS, adminLoginSchema, errorMessage, isServiceError, totpCodeSchema } from '@bazarhq/shared';
 import { BazarLogo } from '../../brand';
 import { Alert, Button, Modal, TextField } from '../../components';
-import { useAdminPaths, useAsync, useNavigation, useServices, useSession } from '../../context';
+import { useAdminPaths, useNavigation, useServices, useSession } from '../../context';
 import { useZodForm } from '../../form';
 import { PasswordInput } from '../customer/auth';
 
@@ -32,8 +30,6 @@ function AdminAuthFrame({ title, description, children, footer }: { title: strin
 export interface AdminDemoTools {
   accounts: { email: string; password: string; note: string }[];
   totpCode: string;
-  network: () => 'allowlisted' | 'blocked';
-  setNetwork: (n: 'allowlisted' | 'blocked') => void;
   expireSession: () => void;
 }
 
@@ -42,8 +38,6 @@ export function AdminLogin({ demo, expired }: { demo?: AdminDemoTools | null; ex
   const { navigate } = useNavigation();
   const a = useAdminPaths();
   const { session, status } = useSession();
-  const [tick, setTick] = useState(0);
-  const net = useAsync(() => services.adminAuth.checkNetwork(), [tick]);
   const [error, setError] = useState<{ tone: 'danger' | 'warning'; text: string } | null>(null);
   const form = useZodForm(adminLoginSchema, { email: '', password: '' });
 
@@ -61,35 +55,17 @@ export function AdminLogin({ demo, expired }: { demo?: AdminDemoTools | null; ex
     }
   });
 
-  const blocked = net.data && !net.data.allowed;
   return (
     <AdminAuthFrame
       title="Super Admin sign in"
       description="Restricted to BazarHQ platform administrators."
-      footer={<>Every action in the admin console is recorded in the audit log with your account and IP address.</>}
+      footer={<>Every privileged action in the admin console is recorded in the audit log.</>}
     >
       {expired && (
         <Alert tone="warning" className="mb-4" title="Session ended">
           You were signed out after {ADMIN_LIMITS.idleTimeoutMinutes} minutes of inactivity.
         </Alert>
       )}
-      <div
-        className={`mb-4 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] ${net.loading ? 'bg-canvas text-ink-muted' : blocked ? 'bg-red-50 text-red-800' : 'bg-brand-50 text-brand-900'}`}
-        role="status"
-      >
-        {net.loading ? (
-          <LoaderCircle className="size-4 animate-spin" aria-hidden />
-        ) : blocked ? (
-          <WifiOff className="size-4" aria-hidden />
-        ) : (
-          <Wifi className="size-4" aria-hidden />
-        )}
-        {net.loading
-          ? 'Checking network…'
-          : blocked
-            ? `Connection from ${net.data!.ip} is not on the approved network. Connect to the office VPN.`
-            : `Approved network · ${net.data?.ip}`}
-      </div>
       {error && (
         <Alert tone={error.tone} className="mb-4">
           {error.text}
@@ -104,14 +80,7 @@ export function AdminLogin({ demo, expired }: { demo?: AdminDemoTools | null; ex
           {...form.register('password')}
           error={form.formState.errors.password?.message}
         />
-        <Button
-          type="submit"
-          block
-          size="lg"
-          loading={form.formState.isSubmitting}
-          disabled={Boolean(blocked)}
-          icon={<LockKeyhole className="size-4" aria-hidden />}
-        >
+        <Button type="submit" block size="lg" loading={form.formState.isSubmitting} icon={<LockKeyhole className="size-4" aria-hidden />}>
           Continue
         </Button>
       </form>
@@ -140,16 +109,6 @@ export function AdminLogin({ demo, expired }: { demo?: AdminDemoTools | null; ex
           <p className="mt-2 text-[12px] text-ink-muted">
             TOTP code: <code className="rounded bg-canvas px-1">{demo.totpCode}</code>
           </p>
-          <button
-            type="button"
-            className="mt-2 text-[12.5px] font-semibold text-brand-700"
-            onClick={() => {
-              demo.setNetwork(demo.network() === 'allowlisted' ? 'blocked' : 'allowlisted');
-              setTick((t) => t + 1);
-            }}
-          >
-            Simulate {blocked ? 'approved VPN' : 'unapproved network'}
-          </button>
         </details>
       )}
     </AdminAuthFrame>

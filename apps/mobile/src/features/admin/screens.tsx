@@ -1,7 +1,7 @@
 /** Super Admin stack for Android, reusing the shared admin features from @bazarhq/ui. */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Activity, Banknote, Bell, FileText, Gavel, LoaderCircle, LogOut, Megaphone, Palette, ShieldCheck, ShieldX, ShoppingBag, User } from 'lucide-react';
+import { Activity, Banknote, Bell, FileText, Gavel, LogOut, Megaphone, Palette, ShoppingBag, User } from 'lucide-react';
 import { DEMO_ACCOUNTS } from '@bazarhq/shared';
 import {
   AdminDashboardView,
@@ -16,7 +16,6 @@ import {
   AnnouncementsView,
   AuditLogView,
   Badge,
-  BazarLogo,
   Button,
   Card,
   CustomerDetailView,
@@ -30,8 +29,6 @@ import {
   StoresView,
   SystemHealthView,
   ThemesView,
-  cn,
-  useAsync,
   useServices,
   useSession,
   useUnreadCount,
@@ -51,8 +48,6 @@ export function AdminLoginScreen() {
         ? {
             accounts: DEMO_ACCOUNTS.filter((x) => x.role === 'super_admin'),
             totpCode: devTools.demoTotpCode,
-            network: () => devTools!.adminNetwork(),
-            setNetwork: (n) => devTools!.setAdminNetwork(n),
             expireSession: () => devTools!.expireAdminSession(),
           }
         : null,
@@ -60,69 +55,6 @@ export function AdminLoginScreen() {
   );
   return <AdminLogin demo={demo} expired={sp.get('expired') === '1'} />;
 }
-/** Step 1 on Android: confirm the approved VPN / allowlisted network path before any credentials are entered. */
-export function NetworkCheckScreen() {
-  const services = useServices();
-  const navigate = useNavigate();
-  const [tick, setTick] = useState(0);
-  const net = useAsync(() => services.adminAuth.checkNetwork(), [tick]);
-  const ok = net.data?.allowed;
-  return (
-    <main className="flex min-h-dvh flex-col bg-navy-950 px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(32px+env(safe-area-inset-top))] text-white">
-      <BazarLogo tone="light" subtitle="Super Admin" />
-      <h1 className="mt-10 text-2xl font-bold">Network access check</h1>
-      <p className="mt-2 text-sm text-navy-100">
-        The admin console only works over the BazarHQ managed VPN or an allowlisted network. TOTP is verified by the server after sign-in.
-      </p>
-      <div
-        className={cn(
-          'mt-6 flex items-start gap-3 rounded-2xl p-4 ring-1',
-          net.loading ? 'bg-white/5 ring-white/10' : ok ? 'bg-brand-500/15 ring-brand-400/30' : 'bg-red-500/15 ring-red-400/30',
-        )}
-        role="status"
-      >
-        {net.loading ? (
-          <LoaderCircle className="size-5 animate-spin" aria-hidden />
-        ) : ok ? (
-          <ShieldCheck className="size-5 text-brand-300" aria-hidden />
-        ) : (
-          <ShieldX className="size-5 text-red-300" aria-hidden />
-        )}
-        <div>
-          <p className="font-semibold">{net.loading ? 'Checking…' : ok ? 'Approved network' : 'Access blocked'}</p>
-          <p className="text-[13px] text-navy-100">
-            {net.loading
-              ? 'Asking the server which network you are on.'
-              : ok
-                ? `Connected from ${net.data!.ip}.`
-                : `Connected from ${net.data?.ip ?? 'an unknown network'}. Turn on the BazarHQ VPN, then check again.`}
-          </p>
-        </div>
-      </div>
-      <div className="mt-auto space-y-2 pt-8">
-        <Button block size="lg" disabled={!ok} onClick={() => navigate(a.login)}>
-          Continue to sign in
-        </Button>
-        <Button block size="lg" variant="ghost" className="text-white" onClick={() => setTick((t) => t + 1)}>
-          Check again
-        </Button>
-        {devTools && showDemoTools && (
-          <button
-            type="button"
-            className="w-full pt-2 text-[12.5px] font-semibold text-navy-200 underline"
-            onClick={() => {
-              devTools!.setAdminNetwork(devTools!.adminNetwork() === 'allowlisted' ? 'blocked' : 'allowlisted');
-              setTick((t) => t + 1);
-            }}
-          >
-            Demo: simulate {ok ? 'an unapproved network' : 'the approved VPN'}
-          </button>
-        )}
-      </div>
-    </main>
-  );
-}
-
 export const AdminTotpScreen = () => <AdminTotp demoCode={devTools && showDemoTools ? devTools.demoTotpCode : null} />;
 
 const wrap = (node: React.ReactNode) => <Page>{node}</Page>;

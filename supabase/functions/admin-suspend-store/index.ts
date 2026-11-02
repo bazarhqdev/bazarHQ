@@ -6,7 +6,7 @@
  *             011) and new tokens are refused by the access-token hook.
  *   reinstate the account becomes active; the store stays unpublished until
  *             the merchant republishes it.
- * Super Admin with TOTP on the approved network. Audited with actor and IP.
+ * Super Admin with a verified TOTP session. Audited with actor and available request IP.
  */
 import { requireSuperAdmin } from '../_shared/auth.ts';
 import { rpc, serviceClient } from '../_shared/db.ts';

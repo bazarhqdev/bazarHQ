@@ -152,13 +152,8 @@ export function createAdminServices(ctx: MockContext): { adminAuth: AdminAuthSer
   }
 
   const adminAuth: AdminAuthService = {
-    checkNetwork: () => read(() => ({ allowed: ctx.db.admin.network === 'allowlisted', ip: ctx.db.admin.ip }), 0.4),
-
     signIn: (email, password) =>
       write(() => {
-        if (ctx.db.admin.network !== 'allowlisted') {
-          throw new ServiceError('FORBIDDEN', 'Super Admin sign-in is only allowed from the approved office network or VPN.');
-        }
         const u = ctx.db.users.find((x) => x.profile.email.toLowerCase() === email.trim().toLowerCase() && x.profile.role === 'super_admin');
         const generic = new ServiceError('UNAUTHENTICATED', 'Incorrect email or password.');
         if (!u) throw generic;
@@ -192,7 +187,6 @@ export function createAdminServices(ctx: MockContext): { adminAuth: AdminAuthSer
       write(() => {
         const pending = ctx.db.admin.pendingMfaUserId;
         if (!pending) throw new ServiceError('UNAUTHENTICATED', 'Start again with your email and password.');
-        if (ctx.db.admin.network !== 'allowlisted') throw new ServiceError('FORBIDDEN', 'Super Admin access is only allowed from the approved network or VPN.');
         const u = userById(pending)!;
         if (!/^\d{6}$/.test(code) || code !== DEMO_TOTP_CODE) {
           throw new ServiceError('VALIDATION', 'That code is not valid. Wait for the next code in your authenticator app and try again.', {

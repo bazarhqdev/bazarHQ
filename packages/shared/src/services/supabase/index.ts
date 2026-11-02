@@ -69,8 +69,8 @@ export const SUPABASE_OPERATION_MAP = {
   'account.escalateReturn': 'EF dispute escalation → Super Admin queue',
   'account.createTicket/replyTicket': 'API-18/19 EF ticket routing (store vs platform queue, FR-SUP-03)',
   'account.deleteAccount': 'EF account deletion (anonymise, retain transaction history §20.6)',
-  // Super Admin (§12) — every call passes the IP allowlist at the edge and requires an AAL2 (TOTP) session.
-  'adminAuth.signIn/verifyTotp': 'supabase.auth.signInWithPassword + mfa.challengeAndVerify; IP allowlist at gateway (FR-SA-01/02)',
+  // Super Admin (§12) — every privileged call requires an AAL2 (TOTP) session.
+  'adminAuth.signIn/verifyTotp': 'supabase.auth.signInWithPassword + mfa.challengeAndVerify; AAL2 required (FR-SA-02)',
   'admin.dashboard/health': 'API-27 EF platform metrics + monitoring probes',
   'admin.suspendMerchant/reinstateMerchant': 'API-29/30 EF (reason, unpublish store, revoke sessions, audit_logs)',
   'admin.deleteMerchant': 'API-31 EF (confirmation phrase, retain transactions, audit)',

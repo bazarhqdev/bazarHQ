@@ -14,8 +14,6 @@ function Login() {
     return {
       accounts: DEMO_ACCOUNTS.filter((a) => a.role === 'super_admin'),
       totpCode: dev.demoTotpCode,
-      network: () => dev.adminNetwork(),
-      setNetwork: (n) => dev.setAdminNetwork(n),
       expireSession: () => dev.expireAdminSession(),
     };
   }, []);

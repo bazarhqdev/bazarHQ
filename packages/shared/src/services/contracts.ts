@@ -349,9 +349,8 @@ export interface CustomerAccountService {
 /* Super Admin                                                          */
 /* ------------------------------------------------------------------ */
 
-/** AUTH-08/09/10: allowlisted network, password, mandatory TOTP, 30-minute idle expiry. */
+/** Super Admin password, mandatory TOTP, and 30-minute idle expiry. */
 export interface AdminAuthService {
-  checkNetwork(): Promise<{ allowed: boolean; ip: string }>;
   signIn(email: string, password: string): Promise<{ mfaRequired: true }>;
   verifyTotp(code: string): Promise<Session>;
   /** Records activity and returns the refreshed session (idle timer). */

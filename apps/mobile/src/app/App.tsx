@@ -69,7 +69,6 @@ const C = lazyScreens(() => import('@/features/customer/screens'), [
   'AddressesScreen',
 ] as const);
 const A = lazyScreens(() => import('@/features/admin/screens'), [
-  'NetworkCheckScreen',
   'AdminLoginScreen',
   'AdminTotpScreen',
   'DashboardScreen',
@@ -231,10 +230,10 @@ export function App() {
                       </Route>
 
                       {/* Super Admin */}
-                      <Route path="/a/network" element={<A.NetworkCheckScreen />} />
+                      <Route path="/a/network" element={<Navigate to="/a/login" replace />} />
                       <Route path="/a/login" element={<A.AdminLoginScreen />} />
                       <Route path="/a/totp" element={<A.AdminTotpScreen />} />
-                      <Route path="/a" element={<Navigate to="/a/network" replace />} />
+                      <Route path="/a" element={<Navigate to="/a/login" replace />} />
                       <Route element={<AdminTabLayout />}>
                         <Route path="/a/dashboard" element={<A.DashboardScreen />} />
                         <Route path="/a/health" element={<A.HealthScreen />} />

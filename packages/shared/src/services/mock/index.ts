@@ -4,7 +4,7 @@
  *
  * It behaves like the trusted server: it re-validates input, enforces the
  * order/return/refund/ticket/policy state machines, the stock model, tenant
- * ownership (403 for other stores' resources), Super Admin network + TOTP +
+ * ownership (403 for other stores' resources), Super Admin TOTP +
  * idle checks, and idempotency keys. State is persisted to browser storage
  * (per viewer, best-effort) so a demo survives reloads.
  *
@@ -33,7 +33,7 @@ export interface MockDevTools {
   /** Returns the most recent password-reset token (in production it is only emailed). */
   latestResetToken(): string | null;
   simulateIncomingOrder(): Promise<void>;
-  /** Simulates the trusted gateway's IP/VPN allowlist decision for Super Admin access. */
+  /** Legacy test metadata only; changing this value does not authorize or block Admin access. */
   setAdminNetwork(network: 'allowlisted' | 'blocked'): void;
   adminNetwork(): 'allowlisted' | 'blocked';
   /** Ages the admin session past the 30-minute idle limit. */

@@ -6,7 +6,7 @@
  *   announcement.save (draft|schedule|send) sent announcements are immutable
  *   announcement.unschedule / .delete
  *   policy.submit / .approve / .publish     dual approval: the submitter can't approve
- * Super Admin with TOTP on the approved network; every action is audited with IP.
+ * Super Admin with a verified TOTP session; available request IP is retained as audit metadata.
  */
 import { requireSuperAdmin } from '../_shared/auth.ts';
 import { rpc, serviceClient } from '../_shared/db.ts';

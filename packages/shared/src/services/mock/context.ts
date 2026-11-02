@@ -3,7 +3,7 @@
  * module (merchant, storefront, customer account, admin) is built on this.
  *
  * It behaves like the trusted server: re-validates role, status, email
- * verification, tenancy and (for Super Admin) network + TOTP + idle timeout.
+ * verification, tenancy and (for Super Admin) TOTP + idle timeout.
  */
 import { ADMIN_LIMITS, PAYMENT_METHODS } from '../../constants';
 import type { AuditLog, Order, OrderDetail, PaymentConfig, Product, ReturnRequest, Session, Store, StorefrontStore } from '../../types';
@@ -147,13 +147,10 @@ export function createMockContext(options: MockOptions = {}) {
   }
 
   /**
-   * Super Admin: allowlisted network (AUTH-08), completed TOTP (AUTH-09) and
-   * a session that has not been idle for 30 minutes (AUTH-10).
+   * Super Admin: completed TOTP (AUTH-09) and a session that has not
+   * been idle for 30 minutes (AUTH-10).
    */
   function requireAdmin(opts: { touch?: boolean } = {}): MockUser {
-    if (state.admin.network !== 'allowlisted') {
-      throw new ServiceError('FORBIDDEN', 'Super Admin access is only allowed from the approved network or VPN.');
-    }
     const u = currentUser();
     if (u.profile.role !== 'super_admin') throw new ServiceError('FORBIDDEN', 'This area is only available to Super Admins.');
     if (!state.admin.mfaVerified) throw new ServiceError('UNAUTHENTICATED', 'Two-factor verification is required.');
@@ -185,7 +182,7 @@ export function createMockContext(options: MockOptions = {}) {
       const last = state.admin.lastActivityAt ? Date.parse(state.admin.lastActivityAt) : null;
       session.admin = {
         mfaVerified: state.admin.mfaVerified,
-        networkAllowed: state.admin.network === 'allowlisted',
+        networkAllowed: true,
         idleExpiresAt: last ? new Date(last + ADMIN_LIMITS.idleTimeoutMinutes * 60_000).toISOString() : null,
         ip: state.admin.ip,
       };

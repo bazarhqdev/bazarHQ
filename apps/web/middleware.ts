@@ -2,10 +2,9 @@
  * Edge middleware:
  *  1. Store subdomains — `<sub>.bazarhq.com/…` is served from `/store/<sub>/…`
  *     (FR-C-37). Reserved hosts (www, admin, merchant, api, app) are skipped.
- *  2. Super Admin network gate — `/admin/*` requires the caller IP to be on
- *     ADMIN_IP_ALLOWLIST (FR-SA-01). This is a server-side check; the UI and
- *     the mock service layer only mirror it. TOTP + 30-minute idle timeout are
- *     enforced by the auth layer (Supabase MFA / AAL2) in production.
+ *  2. Super Admin route protection — `/admin/*` pages require a session with
+ *     the super_admin role and AAL2. This is a routing guard only; RLS and
+ *     Supabase Edge Functions enforce data and operation authorization.
  *  3. Role-aware routing (Supabase mode): protected areas need a session whose
  *     role claim matches — /merchant → merchant, /admin → super_admin,
  *     /customer|/orders|/profile → customer. This only routes; it does not
@@ -31,36 +30,6 @@ function storeSubdomain(host: string): string | null {
   const sub = h.slice(0, -(ROOT_DOMAIN.length + 1));
   if (!sub || sub.includes('.') || RESERVED.has(sub) || !/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(sub)) return null;
   return sub;
-}
-
-function clientIp(req: NextRequest): string | null {
-  const fwd = req.headers.get('x-forwarded-for');
-  if (fwd) return fwd.split(',')[0]!.trim();
-  const real = req.headers.get('x-real-ip');
-  if (real) return real.trim();
-  // Direct local connection (next dev / next start without a proxy).
-  const host = (req.headers.get('host') ?? '').split(':')[0];
-  return host === 'localhost' || host === '127.0.0.1' ? '127.0.0.1' : null;
-}
-
-/** Exact IPs or IPv4 CIDR blocks, comma separated. `*` allows all (local demos only). */
-function ipAllowed(ip: string | null): boolean {
-  const raw = process.env.ADMIN_IP_ALLOWLIST?.trim();
-  // Fail closed in production when no allowlist is configured.
-  if (!raw) return !isProd;
-  if (raw === '*') return true;
-  if (!ip) return false;
-  return raw.split(',').some((entry) => {
-    const rule = entry.trim();
-    if (!rule) return false;
-    if (!rule.includes('/')) return rule === ip || (rule === '127.0.0.1' && ip === '::1');
-    const [base, bitsStr] = rule.split('/');
-    const bits = Number(bitsStr);
-    const toInt = (a: string) => a.split('.').reduce((n, o) => (n << 8) + Number(o), 0) >>> 0;
-    if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip) || !/^\d+\.\d+\.\d+\.\d+$/.test(base!) || !(bits >= 0 && bits <= 32)) return false;
-    const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
-    return (toInt(ip) & mask) === (toInt(base!) & mask);
-  });
 }
 
 const DATA_SOURCE = process.env.NEXT_PUBLIC_DATA_SOURCE ?? (isProd ? '' : 'mock');
@@ -136,11 +105,6 @@ export function middleware(req: NextRequest) {
   // data-source setting. Fail closed before serving any application route.
   if (isProd && DATA_SOURCE !== 'supabase') {
     return withHeaders(new NextResponse('BazarHQ is temporarily unavailable because production data access is not configured.', { status: 503 }), admin);
-  }
-
-  if (admin && !ipAllowed(clientIp(req))) {
-    const body = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Access restricted · BazarHQ</title><body style="font-family:system-ui,sans-serif;background:#f4f6f5;color:#0f1d2e;display:grid;place-items:center;min-height:100vh;margin:0"><main style="max-width:28rem;padding:2rem;text-align:center"><h1 style="font-size:1.25rem">Access restricted</h1><p style="color:#4b5a6b">The BazarHQ admin console is only available from the approved office network or VPN.</p></main></body></html>`;
-    return withHeaders(new NextResponse(body, { status: 403, headers: { 'content-type': 'text/html; charset=utf-8' } }), true);
   }
 
   if (DATA_SOURCE === 'supabase') {

@@ -1,7 +1,7 @@
 /**
  * admin-refund-intervention — FR-REF-07. A Super Admin can move a stalled
  * refund to processing, mark it failed, or settle it with evidence. Each step
- * is audited as refund.admin_intervention with the admin's id and IP.
+ * is audited as refund.admin_intervention with the admin's id and available request IP.
  */
 import { requireSuperAdmin } from '../_shared/auth.ts';
 import { rpc, serviceClient } from '../_shared/db.ts';
@@ -27,7 +27,7 @@ export const serve = handler({}, async ({ req, body }) => {
     p_refund_id: input.refundId,
     p_action: input.action,
     p_reference: input.reference ?? null,
-    p_note: `${input.note} [ip ${admin.ip}]`.slice(0, 500),
+    p_note: `${input.note}${admin.ip ? ` [ip ${admin.ip}]` : ''}`.slice(0, 500),
   });
 });
 

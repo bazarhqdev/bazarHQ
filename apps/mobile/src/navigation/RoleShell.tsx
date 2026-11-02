@@ -120,7 +120,7 @@ export function CustomerTabLayout() {
   );
 }
 
-/** Super Admin stack: guard (network + TOTP + 30-min idle) and tab bar. */
+/** Super Admin stack: guard (AAL2/TOTP + 30-minute idle timeout) and tab bar. */
 export function AdminTabLayout() {
   const unread = useUnreadCount();
   // Spec: Home · Merchants · Stores · Support · Audit Logs · More
@@ -178,7 +178,7 @@ export function WelcomeScreen() {
     { to: c.home, icon: ShoppingBag, title: 'Shop', text: 'Find a store, check out and track orders. No account needed.' },
     { to: '/login', icon: Store, title: 'Sell', text: 'Manage your store, products, orders and payments.' },
     { to: c.login(), icon: LogIn, title: 'Sign in', text: 'Already have an account? We’ll open the right app for your role.' },
-    { to: '/a/network', icon: ShieldCheck, title: 'Platform admin', text: 'BazarHQ staff only — approved network and TOTP required.' },
+    { to: '/a/login', icon: ShieldCheck, title: 'Platform admin', text: 'BazarHQ staff only — password and authenticator verification required.' },
   ];
   return (
     <main className="flex min-h-dvh flex-col bg-navy-950 px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(40px+env(safe-area-inset-top))] text-white">

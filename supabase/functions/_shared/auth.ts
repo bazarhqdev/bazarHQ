@@ -5,8 +5,8 @@
  *    the signature, expiry and that the session still exists.
  * 2. Role and status come from public.profiles (get_actor_context), never from
  *    client input or user metadata (AUTHZ-01/02).
- * 3. Super Admin calls additionally need an AAL2 (TOTP) session and an
- *    allowlisted network (FR-SA-01/02, AUTH-08/09), checked server-side.
+ * 3. Super Admin calls additionally require an AAL2 (TOTP) session.
+ *    Request IP may be retained as audit metadata but is not authorization.
  */
 import { rpc, serviceClient } from './db.ts';
 import { decodeBase64UrlToString } from './encoding.ts';
@@ -105,15 +105,13 @@ export function clientIp(req: Request): string | null {
   return ipv4.test(candidate) || (candidate.includes(':') && ipv6.test(candidate)) ? candidate : null;
 }
 
-/** Super Admin with a TOTP-verified session from an allowlisted network. */
-export async function requireSuperAdmin(req: Request): Promise<Actor & { ip: string }> {
+/** Super Admin with a TOTP-verified AAL2 session. IP is optional audit metadata only. */
+export async function requireSuperAdmin(req: Request): Promise<Actor & { ip: string | null }> {
   const actor = await requireActor(req, ['super_admin']);
-  const ip = clientIp(req);
-  const denied = 'Super Admin access needs the approved network and a verified second factor.';
-  if (actor.aal !== 'aal2' || !ip) throw forbidden(denied);
-  const allowed = await rpc<boolean>(serviceClient(), 'admin_network_check', { p_ip: ip });
-  if (!allowed) throw forbidden(denied);
-  return { ...actor, ip };
+  if (actor.aal !== 'aal2') {
+    throw forbidden('Super Admin access requires a verified second factor.');
+  }
+  return { ...actor, ip: clientIp(req) };
 }
 
 /** Scheduler-only endpoints: constant-time comparison of the shared secret. */

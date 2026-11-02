@@ -1,14 +1,13 @@
 /**
  * Super Admin console on Supabase (SRS §12, API-27..36, FR-SA-*).
  *
- * Every call first refreshes the admin session (TOTP/AAL2 + approved network +
- * 30-minute idle timer). The database re-checks the same gate in
- * is_super_admin(), so this client check is only for UX.
+ * Every call first refreshes the admin session (TOTP/AAL2 + 30-minute idle timer).
+ * The database re-checks the active role and AAL2 in is_super_admin().
  *
  * Reads: Super Admin RLS policies and admin_* SECURITY DEFINER read RPCs.
  * Privileged writes (suspend, delete, governance, refund intervention, return
  * disputes, manual payment review): Edge Functions that verify TOTP and the
- * caller's network, and write audit_logs with the admin's id and IP.
+ * caller's role, and write audit_logs with the admin's id and available IP.
  * There is no admin path that changes an ordinary order or delivery status.
  */
 import { ORDER_STATUSES, PAYMENT_METHODS } from '../../constants';

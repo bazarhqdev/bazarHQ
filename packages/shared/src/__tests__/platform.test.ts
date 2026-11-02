@@ -239,10 +239,8 @@ describe('merchant returns and refunds (§14)', () => {
 });
 
 describe('super admin (§12)', () => {
-  it('requires the allowlisted network and TOTP (FR-SA-01/02)', async () => {
+  it('requires password and TOTP without IP allowlisting (FR-SA-02)', async () => {
     s.dev.setAdminNetwork('blocked');
-    await rejectsWith(s.adminAuth.signIn('admin@bazarhq.test', 'Admin12345'), 'FORBIDDEN');
-    s.dev.setAdminNetwork('allowlisted');
     const r = await s.adminAuth.signIn('admin@bazarhq.test', 'Admin12345');
     assert.equal(r.mfaRequired, true);
     await rejectsWith(s.admin.dashboard({ preset: 'custom', from: '2026-01-01', to: '2026-12-31' }), 'UNAUTHENTICATED');

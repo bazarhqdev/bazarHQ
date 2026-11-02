@@ -50,7 +50,7 @@ export interface MockUser {
 export type StoredProduct = Product & { deletedAt: string | null };
 
 export interface AdminState {
-  /** Simulated result of the trusted network/IP allowlist check (AUTH-08). */
+  /** Legacy network metadata retained for older mock fixtures; not an authorization factor. */
   network: 'allowlisted' | 'blocked';
   ip: string;
   pendingMfaUserId: string | null;

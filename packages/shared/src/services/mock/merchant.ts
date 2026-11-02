@@ -159,7 +159,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
           const u = ctx.db.users.find((x) => x.profile.id === ctx.db.currentUserId);
           if (!u || u.profile.status === 'deleted') return null;
           if (u.profile.role === 'super_admin') {
-            // Admin sessions are only valid on the allowlisted network, after TOTP and within the idle window.
+            // Admin sessions are only valid after TOTP and within the idle window.
             try {
               ctx.requireAdmin({ touch: false });
             } catch {
@@ -173,7 +173,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
         write(() => {
           const u = ctx.db.users.find((x) => x.profile.email.toLowerCase() === email.trim().toLowerCase());
           const generic = new ServiceError('UNAUTHENTICATED', 'Incorrect email or password.');
-          // Super Admins must use the admin login (IP allowlist + TOTP, §12.1); deleted accounts can't sign in.
+          // Super Admins must use the admin login (password + TOTP, §12.1); deleted accounts cannot sign in.
           if (!u || u.profile.role === 'super_admin' || u.profile.status === 'deleted') throw generic;
           if (u.lockedUntil && Date.parse(u.lockedUntil) > now().getTime()) {
             throw new ServiceError(

@@ -74,7 +74,7 @@ reset role;
 select set_config('request.headers', '', true);
 select set_config('request.jwt.claims', '{"sub":"31000000-0000-4000-8000-0000000000d1","role":"authenticated","aal":"aal1"}', true);
 set local role authenticated;
-select throws_ok($$select public.admin_dashboard(now() - interval '1 day', now())$$, '42501', null, 'admin_dashboard still needs TOTP + network');
+select throws_ok($$select public.admin_dashboard(now() - interval '1 day', now())$$, '42501', null, 'admin_dashboard still requires TOTP (AAL2)');
 reset role;
 
 -- ================================================================ 013: stock-model checks at commit time, as a client

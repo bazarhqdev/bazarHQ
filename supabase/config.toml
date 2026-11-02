@@ -163,9 +163,6 @@ verify_jwt = false
 [functions.payment-webhook]
 verify_jwt = false
 
-[functions.admin-network-check]
-verify_jwt = false
-
 [functions.send-notification]
 verify_jwt = false
 

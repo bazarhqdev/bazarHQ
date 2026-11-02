@@ -63,7 +63,7 @@ export const customerPaths: CustomerPaths = {
   merchantLogin: '/login',
 };
 
-/** Super Admin stack (prefix /a). The mock enforces the same network + TOTP + idle rules as the web. */
+/** Super Admin stack (prefix /a). The mock enforces TOTP + idle-timeout rules like the web. */
 export const adminPaths: AdminPaths = {
   login: '/a/login',
   totp: '/a/totp',
@@ -90,6 +90,6 @@ export const adminPaths: AdminPaths = {
 };
 
 /** Screens where the Android back button exits the app (MOB-17). */
-export const ROOT_SCREENS = ['/', '/welcome', '/home', '/login', '/onboarding', '/c', '/c/login', '/a/dashboard', '/a/login', '/a/network'];
+export const ROOT_SCREENS = ['/', '/welcome', '/home', '/login', '/onboarding', '/c', '/c/login', '/a/dashboard', '/a/login'];
 
 export const ROLE_START = { merchant: '/home', customer: '/c', super_admin: '/a/dashboard' } as const;

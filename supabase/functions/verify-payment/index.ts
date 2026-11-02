@@ -40,7 +40,7 @@ export const serve = handler({}, async ({ req, body }) => {
     return { outcome: outcome?.result ?? 'nothing_pending', ...(await paymentSnapshot(input.orderId)) };
   }
 
-  // Manual review: owning merchant, or a Super Admin on the approved network with TOTP.
+  // Manual review: owning merchant, or an AAL2-verified Super Admin.
   let reviewerIp: string | null = clientIp(req);
   if (actor.role === 'super_admin') {
     reviewerIp = (await requireSuperAdmin(req)).ip;
