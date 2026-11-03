@@ -26,16 +26,27 @@ export function InventoryScreen() {
   const productFilter = params.get('product');
   const [state, setState] = useState<StockState | 'all'>('all');
   const [search, setSearch] = useState('');
-  const q = useDebounced(search);
-  const rows = useAsync(() => services.inventory.list({ state, search: q }), [state, q]);
-  const all = useAsync(() => services.inventory.list(), [rows.data]);
-  const movements = useAsync(() => services.inventory.movements({ productId: productFilter ?? undefined, limit: 15 }), [productFilter, rows.data]);
+  const q = useDebounced(search).trim().toLowerCase();
+  // The service currently loads the product inventory before applying filters.
+  // Fetch it once, then filter locally so search/tab changes do not repeat the same
+  // products + categories requests.
+  const all = useAsync(() => services.inventory.list(), []);
+  const movements = useAsync(() => services.inventory.movements({ productId: productFilter ?? undefined, limit: 15 }), [productFilter]);
   const [adjusting, setAdjusting] = useState<InventoryRow | null>(null);
-  const visible = useMemo(() => (rows.data ?? []).filter((r) => !productFilter || r.productId === productFilter), [rows.data, productFilter]);
+  const visible = useMemo(
+    () =>
+      (all.data ?? []).filter(
+        (r) =>
+          (!productFilter || r.productId === productFilter) &&
+          (state === 'all' || r.state === state) &&
+          (!q || r.productName.toLowerCase().includes(q) || (r.variantLabel ?? '').toLowerCase().includes(q)),
+      ),
+    [all.data, productFilter, q, state],
+  );
   const count = (s: StockState | 'all') => (all.data ? (s === 'all' ? all.data.length : all.data.filter((r) => r.state === s).length) : undefined);
 
   return (
-    <Screen title="Inventory management" onRefresh={() => Promise.all([rows.reload(), movements.reload()])}>
+    <Screen title="Inventory management" onRefresh={() => Promise.all([all.reload(), movements.reload()])}>
       <SearchInput value={search} onChange={setSearch} placeholder="Search stock…" label="Search inventory" />
       <Tabs
         className="mt-3"
@@ -58,10 +69,10 @@ export function InventoryScreen() {
         </button>
       )}
       <Card className="mt-3">
-        {rows.loading ? (
+        {all.loading ? (
           <SkeletonRows rows={6} />
-        ) : rows.error ? (
-          <ErrorState message={rows.error} onRetry={rows.reload} />
+        ) : all.error ? (
+          <ErrorState message={all.error} onRetry={all.reload} />
         ) : visible.length === 0 ? (
           <EmptyState icon={<Boxes className="size-6" aria-hidden />} title="Nothing here" description="No items match this filter." />
         ) : (
@@ -91,7 +102,7 @@ export function InventoryScreen() {
       </Card>
       <SectionTitle>Recent stock movements</SectionTitle>
       <Card>{movements.loading ? <SkeletonRows rows={3} /> : <MovementList movements={movements.data ?? []} showProduct={!productFilter} />}</Card>
-      <StockAdjustDialog row={adjusting} open={Boolean(adjusting)} onClose={() => setAdjusting(null)} onAdjusted={() => void rows.reload()} />
+      <StockAdjustDialog row={adjusting} open={Boolean(adjusting)} onClose={() => setAdjusting(null)} onAdjusted={() => void Promise.all([all.reload(), movements.reload()])} />
     </Screen>
   );
 }

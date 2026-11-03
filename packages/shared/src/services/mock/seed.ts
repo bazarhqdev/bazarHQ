@@ -2,7 +2,7 @@
  * Deterministic synthetic seed data for the mock service layer (all roles).
  * No real people, stores or credentials. Dates are relative to `now`.
  */
-import { LIMITS } from '../../constants';
+import { DEFAULT_STORE_THEMES, LIMITS } from '../../constants';
 import { dayKey, formatPublicId } from '../../formatters';
 import type {
   AccountUser,
@@ -195,7 +195,7 @@ const STORE_DEFS: StoreDef[] = [
     category: 'groceries',
     tagline: 'Fresh Food • Healthy Life',
     brandColour: '#059669',
-    themeIndex: 1,
+    themeIndex: 3,
     ageDays: 110,
     categories: ['Vegetables', 'Fruits', 'Groceries', 'Dairy & Eggs', 'Beverages', 'Snacks'],
     orderCount: 56,
@@ -356,7 +356,7 @@ const STORE_DEFS: StoreDef[] = [
     category: 'fashion',
     tagline: 'Trendy Fashion for Everyone',
     brandColour: '#BE185D',
-    themeIndex: 5,
+    themeIndex: 4,
     ageDays: 140,
     categories: ['T-Shirts', 'Dresses', 'Shoes', 'Bags', 'Accessories'],
     orderCount: 30,
@@ -461,7 +461,7 @@ const STORE_DEFS: StoreDef[] = [
     category: 'electronics',
     tagline: 'Gadgets you can trust',
     brandColour: '#2563EB',
-    themeIndex: 0,
+    themeIndex: 1,
     ageDays: 150,
     categories: ['Audio', 'Chargers & Cables', 'Wearables', 'Computer Accessories'],
     orderCount: 25,
@@ -564,7 +564,7 @@ const STORE_DEFS: StoreDef[] = [
     category: 'other',
     tagline: 'Toys and clothes for little ones',
     brandColour: '#D97706',
-    themeIndex: 3,
+    themeIndex: 0,
     ageDays: 200,
     categories: ['Toys'],
     orderCount: 6,
@@ -720,22 +720,11 @@ export function createSeed(now: Date = new Date()): MockDb {
 
   /* ------------------------------ Themes ----------------------------- */
 
-  const themeDefs: [string, string, string, boolean][] = [
-    ['Default', 'Balanced layout with a hero banner and product grid.', '#0B1F3A', true],
-    ['Modern', 'Bold imagery, rounded cards and large category tiles.', '#059669', true],
-    ['Minimal', 'Quiet typography with lots of white space.', '#334155', true],
-    ['Classic', 'Traditional storefront with a top category menu.', '#92400E', true],
-    ['Grocery', 'Quick-add buttons and dense listings for daily needs.', '#16A34A', true],
-    ['Fashion', 'Editorial layout for apparel and lookbooks.', '#BE185D', true],
-    ['Retired Classic', 'No longer offered to new stores.', '#64748B', false],
-  ];
-  const themes: ThemeAdmin[] = themeDefs.map(([name, description, accent, isActive], i) => ({
+  const themes: ThemeAdmin[] = DEFAULT_STORE_THEMES.map((theme, i) => ({
     id: uuidFrom(i + 1, 'cccc'),
-    name,
-    description,
+    ...theme,
     previewUrl: null,
-    isActive,
-    accent,
+    isActive: true,
     usedBy: [],
     breakingChangeEffectiveAt: null,
     createdAt: iso(t0 - (400 - i * 20) * DAY),
@@ -1726,7 +1715,7 @@ export function createSeed(now: Date = new Date()): MockDb {
       actorName: adminA.fullName,
       action: 'theme.deactivated',
       resourceType: 'theme',
-      resourceId: themes[6]!.id,
+      resourceId: uuidFrom(7, 'cccc'),
       metadata: { theme: 'Retired Classic' },
       ipAddress: '103.112.10.5',
       createdAt: past(30 * DAY),

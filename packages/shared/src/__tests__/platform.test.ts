@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
-import { createMockServices, createServiceLayer, isServiceError, newIdempotencyKey, type MockPlatformServices } from '../index';
+import { DEFAULT_STORE_THEMES, createMockServices, createServiceLayer, isServiceError, newIdempotencyKey, type MockPlatformServices } from '../index';
 
 let s: MockPlatformServices;
 
@@ -275,6 +275,15 @@ describe('super admin (§12)', () => {
     await rejectsWith(s.admin.deleteMerchant(m.merchant.id, 'DELETE'), 'VALIDATION');
     await s.admin.deleteMerchant(m.merchant.id, `DELETE ${m.merchant.email}`);
     assert.equal((await s.admin.listMerchants({ search: 'tech' })).length, 0);
+  });
+
+  it('provides the five curated default storefront themes', async () => {
+    await signInAdmin();
+    const themes = await s.admin.listThemes();
+    assert.deepEqual(
+      themes.map(({ name, description, accent, isActive }) => ({ name, description, accent, isActive })),
+      DEFAULT_STORE_THEMES.map((theme) => ({ ...theme, isActive: true })),
+    );
   });
 
   it('blocks deleting a theme in use (FR-SA-14)', async () => {

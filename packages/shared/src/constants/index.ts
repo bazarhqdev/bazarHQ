@@ -155,6 +155,15 @@ export const RESERVED_SUBDOMAINS: readonly string[] = ['admin', 'api', 'www', 'a
 
 export const PLATFORM_DOMAIN = 'bazarhq.com';
 
+/** Curated starter themes available to every merchant storefront. */
+export const DEFAULT_STORE_THEMES = [
+  { name: 'Default', description: 'Balanced storefront styling for general-purpose shops.', accent: '#0B1F3A' },
+  { name: 'Modern', description: 'Contemporary styling with a fresh emerald accent.', accent: '#059669' },
+  { name: 'Minimal', description: 'Clean, understated styling with generous whitespace.', accent: '#334155' },
+  { name: 'Grocery', description: 'Fresh green styling for groceries and daily essentials.', accent: '#16A34A' },
+  { name: 'Fashion', description: 'Editorial rose styling for fashion and lifestyle stores.', accent: '#BE185D' },
+] as const;
+
 export const LIMITS = {
   /** FR-M-13 / FR-M-16 */
   imageMaxBytes: 2 * 1024 * 1024,

@@ -2,11 +2,12 @@
 
 /** Super Admin: themes (FR-SA-14/15), announcements (FR-SA-16/17), policies with dual approval (FR-SA-18). */
 import { useState } from 'react';
-import { CalendarClock, CheckCircle2, FileText, Megaphone, Pencil, Plus, Send, Trash2, Users } from 'lucide-react';
+import { CalendarClock, CheckCircle2, FileText, Megaphone, Palette, Pencil, Plus, Send, Trash2, Users } from 'lucide-react';
 import { Controller } from 'react-hook-form';
 import {
   ANNOUNCEMENT_AUDIENCE_LABEL,
   ANNOUNCEMENT_STATUS_LABEL,
+  DEFAULT_STORE_THEMES,
   announcementSchema,
   canApprovePolicy,
   errorMessage,
@@ -57,21 +58,75 @@ export function ThemesView() {
   const list = useAsync(() => services.admin.listThemes(), []);
   const [editing, setEditing] = useState<ThemeAdmin | 'new' | null>(null);
   const [removing, setRemoving] = useState<ThemeAdmin | null>(null);
+  const [installingDefaults, setInstallingDefaults] = useState(false);
+  const existingThemesByName = new Map((list.data ?? []).map((theme) => [theme.name.trim().toLowerCase(), theme] as const));
+  const defaultsToInstall = DEFAULT_STORE_THEMES.filter((theme) => !existingThemesByName.get(theme.name.toLowerCase())?.isActive);
+
+  const installDefaultThemes = async () => {
+    if (!list.data || installingDefaults || defaultsToInstall.length === 0) return;
+    setInstallingDefaults(true);
+    const installed: string[] = [];
+    const failed: string[] = [];
+    try {
+      for (const theme of defaultsToInstall) {
+        const existing = existingThemesByName.get(theme.name.toLowerCase());
+        try {
+          await services.admin.saveTheme(
+            existing
+              ? { name: existing.name, description: existing.description, accent: existing.accent, isActive: true }
+              : { ...theme, isActive: true },
+            existing?.id,
+          );
+          installed.push(theme.name);
+        } catch (error) {
+          failed.push(`${theme.name}: ${errorMessage(error)}`);
+        }
+      }
+      await list.reload();
+      if (failed.length === 0) {
+        toast.success('Default themes ready', `${installed.length} theme(s) added or reactivated. Existing active themes were preserved.`);
+      } else {
+        toast.error('Default theme installation incomplete', `${installed.length} ready; ${failed.length} failed. ${failed[0]}`);
+      }
+    } finally {
+      setInstallingDefaults(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
         title="Themes"
-        description="Storefront themes merchants can choose. A theme in use can’t be deleted; breaking changes give affected merchants 7 days’ notice."
+        description="Install the five curated defaults; existing active themes are preserved. Themes in use can’t be deleted; breaking changes require 7 days’ notice."
         actions={
-          <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing('new')}>
-            New theme
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              icon={<Palette className="size-4" aria-hidden />}
+              onClick={() => void installDefaultThemes()}
+              loading={installingDefaults}
+              disabled={list.loading || Boolean(list.error) || defaultsToInstall.length === 0}
+            >
+              {defaultsToInstall.length === 0
+                ? 'Default themes installed'
+                : `Install ${defaultsToInstall.length} default ${defaultsToInstall.length === 1 ? 'theme' : 'themes'}`}
+            </Button>
+            <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing('new')}>
+              New theme
+            </Button>
+          </>
         }
       />
       {list.loading ? (
         <SkeletonRows rows={4} />
       ) : list.error ? (
         <ErrorState message={list.error} onRetry={list.reload} />
+      ) : list.data!.length === 0 ? (
+        <EmptyState
+          icon={<Palette className="size-6" aria-hidden />}
+          title="No storefront themes yet"
+          description="Install the five curated defaults above to make themes available in Merchant onboarding and store settings."
+        />
       ) : (
         <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {list.data!.map((t) => (

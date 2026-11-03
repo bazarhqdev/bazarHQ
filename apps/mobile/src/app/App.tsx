@@ -15,19 +15,6 @@ import { hideNativeSplash, isNative, openExternal, pickImage, saveTextFile } fro
 import { Guard, NativeBridge, TabLayout } from '@/navigation/Shell';
 import { AdminTabLayout, CustomerTabLayout, RoleHome, WelcomeScreen } from '@/navigation/RoleShell';
 import { SplashScreen } from '@/features/merchant/Splash';
-import { ForgotPasswordScreen, LoginScreen, RegisterScreen, ResetPasswordScreen, VerifyEmailScreen } from '@/features/merchant/auth';
-import { OnboardingScreen, OnboardingStoreScreen, OnboardingThemeScreen } from '@/features/merchant/onboarding';
-import { HomeScreen } from '@/features/merchant/Home';
-import { ProductEditorScreen, ProductsScreen } from '@/features/merchant/products';
-import { InventoryScreen } from '@/features/merchant/Inventory';
-import { OrderDetailScreen, OrdersScreen } from '@/features/merchant/orders';
-import { AnalyticsScreen } from '@/features/merchant/Analytics';
-import { MoreScreen } from '@/features/merchant/More';
-import { PaymentsScreen } from '@/features/merchant/Payments';
-import { NotificationsScreen } from '@/features/merchant/Notifications';
-import { SupportScreen, TicketScreen } from '@/features/merchant/support';
-import { SettingsScreen } from '@/features/merchant/Settings';
-import { ReturnDetailScreen, ReturnsScreen } from '@/features/merchant/returns';
 import { FullScreenLoader } from '@/navigation/Shell';
 
 /** Customer and Super Admin stacks load on demand so the merchant start-up bundle stays small. */
@@ -68,6 +55,32 @@ const C = lazyScreens(() => import('@/features/customer/screens'), [
   'ProfileScreen',
   'AddressesScreen',
 ] as const);
+const M = {
+  auth: lazyScreens(() => import('@/features/merchant/auth'), [
+    'LoginScreen',
+    'RegisterScreen',
+    'ForgotPasswordScreen',
+    'ResetPasswordScreen',
+    'VerifyEmailScreen',
+  ] as const),
+  onboarding: lazyScreens(() => import('@/features/merchant/onboarding'), [
+    'OnboardingScreen',
+    'OnboardingStoreScreen',
+    'OnboardingThemeScreen',
+  ] as const),
+  home: lazyScreens(() => import('@/features/merchant/Home'), ['HomeScreen'] as const),
+  products: lazyScreens(() => import('@/features/merchant/products'), ['ProductsScreen', 'ProductEditorScreen'] as const),
+  inventory: lazyScreens(() => import('@/features/merchant/Inventory'), ['InventoryScreen'] as const),
+  orders: lazyScreens(() => import('@/features/merchant/orders'), ['OrdersScreen', 'OrderDetailScreen'] as const),
+  analytics: lazyScreens(() => import('@/features/merchant/Analytics'), ['AnalyticsScreen'] as const),
+  more: lazyScreens(() => import('@/features/merchant/More'), ['MoreScreen'] as const),
+  payments: lazyScreens(() => import('@/features/merchant/Payments'), ['PaymentsScreen'] as const),
+  notifications: lazyScreens(() => import('@/features/merchant/Notifications'), ['NotificationsScreen'] as const),
+  support: lazyScreens(() => import('@/features/merchant/support'), ['SupportScreen', 'TicketScreen'] as const),
+  settings: lazyScreens(() => import('@/features/merchant/Settings'), ['SettingsScreen'] as const),
+  returns: lazyScreens(() => import('@/features/merchant/returns'), ['ReturnsScreen', 'ReturnDetailScreen'] as const),
+};
+
 const A = lazyScreens(() => import('@/features/admin/screens'), [
   'AdminLoginScreen',
   'AdminTotpScreen',
@@ -140,16 +153,16 @@ export function App() {
                       <Route path="/welcome" element={<WelcomeScreen />} />
 
                       {/* Merchant */}
-                      <Route path={paths.login} element={<LoginScreen />} />
-                      <Route path={paths.register} element={<RegisterScreen />} />
-                      <Route path={paths.forgotPassword} element={<ForgotPasswordScreen />} />
-                      <Route path="/reset-password" element={<ResetPasswordScreen />} />
-                      <Route path={paths.verifyEmail} element={<VerifyEmailScreen />} />
+                      <Route path={paths.login} element={<M.auth.LoginScreen />} />
+                      <Route path={paths.register} element={<M.auth.RegisterScreen />} />
+                      <Route path={paths.forgotPassword} element={<M.auth.ForgotPasswordScreen />} />
+                      <Route path="/reset-password" element={<M.auth.ResetPasswordScreen />} />
+                      <Route path={paths.verifyEmail} element={<M.auth.VerifyEmailScreen />} />
                       <Route
                         path={paths.onboarding}
                         element={
                           <Guard requireStore={false}>
-                            <OnboardingScreen />
+                            <M.onboarding.OnboardingScreen />
                           </Guard>
                         }
                       />
@@ -157,7 +170,7 @@ export function App() {
                         path={paths.onboardingStore}
                         element={
                           <Guard requireStore={false}>
-                            <OnboardingStoreScreen />
+                            <M.onboarding.OnboardingStoreScreen />
                           </Guard>
                         }
                       />
@@ -165,7 +178,7 @@ export function App() {
                         path={paths.onboardingTheme}
                         element={
                           <Guard requireStore={false}>
-                            <OnboardingThemeScreen />
+                            <M.onboarding.OnboardingThemeScreen />
                           </Guard>
                         }
                       />
@@ -176,22 +189,22 @@ export function App() {
                           </Guard>
                         }
                       >
-                        <Route path={paths.dashboard} element={<HomeScreen />} />
-                        <Route path={paths.products} element={<ProductsScreen />} />
-                        <Route path={paths.productNew} element={<ProductEditorScreen />} />
-                        <Route path="/products/:id" element={<ProductEditorScreen />} />
-                        <Route path={paths.inventory} element={<InventoryScreen />} />
-                        <Route path={paths.orders} element={<OrdersScreen />} />
-                        <Route path="/orders/:id" element={<OrderDetailScreen />} />
-                        <Route path={paths.returns} element={<ReturnsScreen />} />
-                        <Route path="/returns/:id" element={<ReturnDetailScreen />} />
-                        <Route path={paths.analytics} element={<AnalyticsScreen />} />
-                        <Route path="/more" element={<MoreScreen />} />
-                        <Route path={paths.paymentSettings} element={<PaymentsScreen />} />
-                        <Route path={paths.notifications} element={<NotificationsScreen />} />
-                        <Route path={paths.support} element={<SupportScreen />} />
-                        <Route path="/support/:id" element={<TicketScreen />} />
-                        <Route path={paths.storeSettings} element={<SettingsScreen />} />
+                        <Route path={paths.dashboard} element={<M.home.HomeScreen />} />
+                        <Route path={paths.products} element={<M.products.ProductsScreen />} />
+                        <Route path={paths.productNew} element={<M.products.ProductEditorScreen />} />
+                        <Route path="/products/:id" element={<M.products.ProductEditorScreen />} />
+                        <Route path={paths.inventory} element={<M.inventory.InventoryScreen />} />
+                        <Route path={paths.orders} element={<M.orders.OrdersScreen />} />
+                        <Route path="/orders/:id" element={<M.orders.OrderDetailScreen />} />
+                        <Route path={paths.returns} element={<M.returns.ReturnsScreen />} />
+                        <Route path="/returns/:id" element={<M.returns.ReturnDetailScreen />} />
+                        <Route path={paths.analytics} element={<M.analytics.AnalyticsScreen />} />
+                        <Route path="/more" element={<M.more.MoreScreen />} />
+                        <Route path={paths.paymentSettings} element={<M.payments.PaymentsScreen />} />
+                        <Route path={paths.notifications} element={<M.notifications.NotificationsScreen />} />
+                        <Route path={paths.support} element={<M.support.SupportScreen />} />
+                        <Route path="/support/:id" element={<M.support.TicketScreen />} />
+                        <Route path={paths.storeSettings} element={<M.settings.SettingsScreen />} />
                       </Route>
 
                       {/* Customer */}

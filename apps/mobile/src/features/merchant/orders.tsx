@@ -33,8 +33,11 @@ export function OrdersScreen() {
   const q = useDebounced(search);
   const [range] = useState(() => makeRange('90d'));
   const orders = useAsync(() => services.orders.list({ status, search: q }), [status, q]);
-  const counts = useAsync(() => services.orders.countsByStatus(), [orders.data]);
-  useServiceEvents(() => void orders.reload());
+  const counts = useAsync(() => services.orders.countsByStatus(), []);
+  useServiceEvents(() => {
+    void orders.reload();
+    void counts.reload();
+  });
   const list = orders.data?.items ?? [];
 
   return (
