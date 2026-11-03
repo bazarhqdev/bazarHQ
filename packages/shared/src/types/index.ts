@@ -91,7 +91,7 @@ export interface Store {
   id: UUID;
   ownerId: UUID;
   name: string;
-  /** Lowercase DNS label; storefront is https://<subdomain>.bazarhq.com */
+  /** Lowercase store slug; public storefront route is /store/<subdomain>. */
   subdomain: string;
   status: StoreStatus;
   themeId: UUID | null;

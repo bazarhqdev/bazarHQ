@@ -1,4 +1,4 @@
-import { PLATFORM_DOMAIN, RESERVED_SUBDOMAINS } from '../constants';
+import { RESERVED_SUBDOMAINS } from '../constants';
 
 const LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/;
 
@@ -56,5 +56,5 @@ export function suggestSubdomains(base: string, isTaken: (s: string) => boolean,
 }
 
 export function storefrontUrl(subdomain: string): string {
-  return `https://${subdomain}.${PLATFORM_DOMAIN}`;
+  return `/store/${encodeURIComponent(normalizeSubdomain(subdomain))}`;
 }

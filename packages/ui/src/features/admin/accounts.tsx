@@ -54,7 +54,7 @@ import { BackLink } from '../customer/account';
 import { TrackingTimeline } from '../customer/public';
 import { PaymentReviewCard } from '../returns';
 
-const storeUrl = (sub: string) => `https://${sub}.bazarhq.com`;
+const storeUrl = (sub: string) => `/store/${encodeURIComponent(sub)}`;
 
 /* ------------------------------------------------------------------ */
 /* Merchants                                                           */
@@ -124,7 +124,7 @@ export function MerchantsView() {
                         {r.store ? (
                           <>
                             <p className="font-medium">{r.store.name}</p>
-                            <p className="text-[12px] text-ink-subtle">{r.store.subdomain}.bazarhq.com</p>
+                            <p className="text-[12px] text-ink-subtle">/store/{r.store.subdomain}</p>
                           </>
                         ) : (
                           <span className="text-ink-subtle">No store yet</span>
@@ -299,7 +299,7 @@ export function MerchantDetailView({ id }: { id: string }) {
                 </KeyValue>
                 <KeyValue label="Address">
                   <a href={storeUrl(d.store.subdomain)} className="text-brand-700 hover:underline" target="_blank" rel="noreferrer">
-                    {d.store.subdomain}.bazarhq.com
+                    /store/{d.store.subdomain}
                   </a>
                 </KeyValue>
               </>
@@ -532,7 +532,7 @@ export function StoresView() {
                     <span className="size-9 shrink-0 rounded-lg" style={{ background: s.brandColour }} aria-hidden />
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{s.name}</p>
-                      <p className="truncate text-[12px] text-ink-subtle">{s.subdomain}.bazarhq.com</p>
+                      <p className="truncate text-[12px] text-ink-subtle">/store/{s.subdomain}</p>
                     </div>
                   </div>
                   <StoreStatusBadge status={s.status} />

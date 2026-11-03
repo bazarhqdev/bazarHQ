@@ -157,11 +157,12 @@ export async function saveTextFile(filename: string, text: string, mime: string)
 /* ---------------------------- Deep links ---------------------------- */
 
 const ROOT_DOMAIN = (import.meta.env.VITE_ROOT_DOMAIN ?? 'bazarhq.com').toLowerCase();
+const ROOT_HOSTS = new Set([ROOT_DOMAIN, `www.${ROOT_DOMAIN}`, 'bazarhq.vercel.app', 'www.bazarhq.vercel.app']);
 
 /**
  * Maps an incoming link to an in-app route:
- *  https://greenbasket.bazarhq.com/products/<id> → /c/s/greenbasket/p/<id>
- *  https://bazarhq.com/track?order=…            → /c/track?order=…
+ *  https://bazarhq.vercel.app/store/greenbasket/products/<id> → /c/s/greenbasket/p/<id>
+ *  https://bazarhq.vercel.app/track?order=…                  → /c/track?order=…
  *  bazarhq://order/<ORDER_ID>                   → /c/track?order=<ORDER_ID>
  *  bazarhq://payment/return?order=…            → /c/track?order=…
  *  bazarhq://merchant/orders/<id>               → /orders/<id>
@@ -186,7 +187,7 @@ export function mapDeepLink(raw: string): string | null {
   }
   if (url.protocol !== 'https:') return null;
   const host = url.hostname.toLowerCase();
-  if (host === ROOT_DOMAIN || host === `www.${ROOT_DOMAIN}`) {
+  if (ROOT_HOSTS.has(host)) {
     if (url.pathname === '/track') return `/c/track${qs}`;
     const store = /^\/store\/([a-z0-9-]{3,63})(\/.*)?$/.exec(url.pathname);
     if (store) return storePath(store[1]!, store[2] ?? '/');

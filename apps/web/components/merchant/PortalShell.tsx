@@ -210,7 +210,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
           className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-[12.5px] font-semibold text-white/80 hover:bg-white/5"
         >
           <ExternalLink className="size-3.5" aria-hidden />
-          <span className="truncate">{store.subdomain}.bazarhq.com</span>
+          <span className="truncate">{storefrontUrl(store.subdomain)}</span>
         </a>
       )}
     </div>

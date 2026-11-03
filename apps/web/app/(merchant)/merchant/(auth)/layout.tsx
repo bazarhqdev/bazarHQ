@@ -1,7 +1,7 @@
 import { CheckCircle2 } from 'lucide-react';
 import { BazarLogo } from '@bazarhq/ui';
 
-const points = ['Your own store at yourname.bazarhq.com', 'bKash, Nagad, Rocket, SSLCommerz and COD', 'Orders, inventory and analytics in one place'];
+const points = ['Your own shareable storefront at /store/yourstore', 'bKash, Nagad, Rocket, SSLCommerz and COD', 'Orders, inventory and analytics in one place'];
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -88,7 +88,7 @@ export default function OnboardingPage() {
       <div className="mt-8">
         <h1 className="text-2xl font-bold tracking-tight text-ink">Finish setting up {store.name}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-muted">
-          {store.subdomain}.bazarhq.com <StoreStatusBadge status={store.status} />
+          {storefrontUrl(store.subdomain)} <StoreStatusBadge status={store.status} />
         </p>
       </div>
       <Card className="mt-6">

@@ -140,7 +140,7 @@ function SettingsBody({ store, onStore, signOut }: { store: Store; onStore: (s: 
   return (
     <>
       <title>Store settings · BazarHQ Merchant</title>
-      <PageHeader title="Store settings" description={`${store.subdomain}.bazarhq.com`} actions={<StoreStatusBadge status={store.status} />} />
+      <PageHeader title="Store settings" description={`Storefront: ${storefrontUrl(store.subdomain)}`} actions={<StoreStatusBadge status={store.status} />} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="hidden lg:block">
           <ul className="sticky top-24 space-y-0.5">
@@ -168,9 +168,9 @@ function SettingsBody({ store, onStore, signOut }: { store: Store; onStore: (s: 
               />
               <TextField
                 label="Store address"
-                value={`${store.subdomain}.bazarhq.com`}
+                value={storefrontUrl(store.subdomain)}
                 disabled
-                hint="Your store address can’t be changed here. Contact support if you need a new one."
+                hint="This path-based URL works on your current BazarHQ host. A custom domain can be connected later."
               />
               <TextField
                 label="Tagline"

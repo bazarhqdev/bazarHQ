@@ -54,8 +54,7 @@ export default function OnboardingStorePage() {
         <Stepper steps={['Store details', 'Theme & branding', 'Go live']} current={1} />
         <h1 className="mt-8 text-2xl font-bold tracking-tight text-ink">You already have a store</h1>
         <Alert tone="info" className="mt-4">
-          Each merchant account can own one store in this version of BazarHQ. Your store <strong>{existing.name}</strong> is at {existing.subdomain}
-          .bazarhq.com. You can change its details in Store settings.
+          Each merchant account can own one store in this version of BazarHQ. Your store <strong>{existing.name}</strong> is available at /store/{existing.subdomain}. You can change its details in Store settings.
         </Alert>
         <div className="mt-6 flex flex-wrap gap-2">
           <Link href={paths.onboardingTheme} className={buttonClass('primary', 'md')}>

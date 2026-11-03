@@ -7,7 +7,6 @@ import {
   checkSubdomainSyntax,
   errorMessage,
   LIMITS,
-  PLATFORM_DOMAIN,
   type OnboardingProgress,
   type SubdomainCheck,
   type Theme,
@@ -84,6 +83,7 @@ export function SubdomainField({
         <span className="flex items-center pl-3 text-ink-subtle">
           <Globe className="size-4" aria-hidden />
         </span>
+        <span className="flex items-center pl-2 text-[12px] text-ink-muted">/store/</span>
         <input
           id="subdomain"
           value={value}
@@ -97,7 +97,6 @@ export function SubdomainField({
           placeholder="yourstore"
           maxLength={63}
         />
-        <span className="flex items-center border-l border-line bg-canvas px-3 text-[13px] text-ink-muted">.{PLATFORM_DOMAIN}</span>
       </div>
       <div id={statusId} aria-live="polite" className="min-h-5 text-[12.5px]">
         {(checking || stale) && value && (
@@ -336,7 +335,7 @@ export function StorePreview({
         <span className="size-2 rounded-full bg-amber-300" aria-hidden />
         <span className="size-2 rounded-full bg-brand-300" aria-hidden />
         <span className="ml-2 truncate rounded bg-white px-2 py-0.5 text-[11px] text-ink-muted">
-          https://{subdomain || 'yourstore'}.{PLATFORM_DOMAIN}
+          /store/{subdomain || 'yourstore'}
         </span>
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">

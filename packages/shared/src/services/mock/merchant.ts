@@ -457,11 +457,11 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
               subdomain,
               available: false,
               reason: 'taken' as const,
-              message: `${subdomain}.bazarhq.com is already taken.`,
+              message: `The /store/${subdomain} address is already taken.`,
               suggestions: suggestSubdomains(subdomain, isTaken),
             };
           }
-          return { subdomain, available: true, reason: 'ok' as const, message: `${subdomain}.bazarhq.com is available.`, suggestions: [] };
+          return { subdomain, available: true, reason: 'ok' as const, message: `The /store/${subdomain} address is available.`, suggestions: [] };
         }, 0.6),
 
       createStore: ({ name, subdomain, category, tagline }) =>
@@ -476,7 +476,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
           const sub = normalizeSubdomain(subdomain);
           const syntax = checkSubdomainSyntax(sub);
           if (!syntax.ok) throw new ServiceError('VALIDATION', syntax.message, { subdomain: syntax.message });
-          if (isTaken(sub)) throw new ServiceError('CONFLICT', `${sub}.bazarhq.com is already taken.`, { subdomain: `${sub}.bazarhq.com is already taken.` });
+          if (isTaken(sub)) throw new ServiceError('CONFLICT', `The /store/${sub} address is already taken.`, { subdomain: `The /store/${sub} address is already taken.` });
           const theme = ctx.db.themes.find((t) => t.isActive);
           const store: Store = {
             id: newId('bbbb'),

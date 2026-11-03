@@ -76,7 +76,7 @@ export function OnboardingScreen() {
   return (
     <Screen
       title="Store setup"
-      subtitle={`${store.subdomain}.bazarhq.com`}
+      subtitle={`/store/${store.subdomain}`}
       actions={
         <Button size="sm" variant="ghost" onClick={() => void signOut()}>
           Sign out

@@ -44,7 +44,7 @@ export function StoreResultCard({ store }: { store: StoreSearchResult }) {
         <p className="truncate text-[15px] font-bold text-ink group-hover:text-brand-700">{store.name}</p>
         <p className="truncate text-[13px] text-ink-muted">{store.tagline ?? (store.category ? STORE_CATEGORY_LABEL[store.category] : '')}</p>
         <p className="mt-1 text-[12px] text-ink-subtle">
-          {store.subdomain}.bazarhq.com · {store.productCount} products
+          /store/{store.subdomain} · {store.productCount} products
         </p>
       </div>
       <ArrowRight className="size-4 shrink-0 text-ink-subtle transition group-hover:translate-x-0.5 group-hover:text-ink" aria-hidden />
@@ -211,7 +211,7 @@ export function Landing() {
   );
 }
 
-/** Accepts a store name, a subdomain, or a pasted link like https://greenbasket.bazarhq.com/... */
+/** Accepts a store name, a subdomain, or a path-based link like https://bazarhq.vercel.app/store/greenbasket. */
 export function normaliseStoreQuery(q: string): string {
   const t = q.trim();
   const host = t.match(/^(?:https?:\/\/)?([a-z0-9-]+)\.bazarhq\.com/i)?.[1];
