@@ -104,9 +104,11 @@ function fromProduct(p?: Product): FormState {
 const num = (s: string) => (s.trim() === '' ? Number.NaN : Number(s));
 
 function toInput(f: FormState): ProductInput {
+  // Normalize composed Bengali/Unicode sequences only on submit. Never normalize
+  // each keystroke: doing so can interrupt Android Gboard/IME composition.
   return {
-    name: f.name,
-    description: f.description,
+    name: f.name.normalize('NFC').trim(),
+    description: f.description.normalize('NFC').trim(),
     categoryId: f.categoryId,
     basePrice: num(f.basePrice),
     compareAtPrice: f.compareAtPrice.trim() === '' ? null : num(f.compareAtPrice),
@@ -143,7 +145,7 @@ function PricePreview({ base, original }: { base: number; original: number }) {
           <span className="rounded-full bg-red-50 px-2 py-0.5 text-[12px] font-bold text-red-700">{Math.round(((original - base) / original) * 100)}% off</span>
         </>
       )}
-      {Number.isFinite(original) && !valid && <span className="text-[12px] text-amber-800">Original price must be higher than the base price to show.</span>}
+      {Number.isFinite(original) && !valid && <span className="text-[12px] text-amber-800">Regular price must be higher than the selling price to show a discount.</span>}
     </div>
   );
 }
@@ -250,6 +252,7 @@ export function ProductForm({ product, categories, onCategoriesChange, onSubmit,
           <div className="grid grid-cols-1 gap-4 px-5 pb-5">
             <TextField
               label="Product name"
+              lang="bn"
               required
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
@@ -259,6 +262,7 @@ export function ProductForm({ product, categories, onCategoriesChange, onSubmit,
             />
             <TextArea
               label="Description"
+              lang="bn"
               required
               value={form.description}
               onChange={(e) => set('description', e.target.value)}
@@ -287,7 +291,7 @@ export function ProductForm({ product, categories, onCategoriesChange, onSubmit,
               value={form.sku}
               onChange={(e) => set('sku', e.target.value)}
               error={errors.sku}
-              hint="Optional stock-keeping code, e.g. VEG-TOM-1KG."
+              hint="Optional. Leave blank and BazarHQ will generate a unique SKU automatically."
               maxLength={64}
             />
           </div>
@@ -413,7 +417,7 @@ export function ProductForm({ product, categories, onCategoriesChange, onSubmit,
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField
-                label="Base price"
+                label="Selling price"
                 required
                 inputMode="decimal"
                 type="number"
@@ -423,10 +427,10 @@ export function ProductForm({ product, categories, onCategoriesChange, onSubmit,
                 value={form.basePrice}
                 onChange={(e) => set('basePrice', e.target.value)}
                 error={errors.basePrice}
-                hint="What customers pay."
+                hint="Required. The price customers will pay."
               />
               <TextField
-                label="Original / asking price"
+                label="Regular price / MRP"
                 inputMode="decimal"
                 type="number"
                 min={0}
@@ -435,7 +439,7 @@ export function ProductForm({ product, categories, onCategoriesChange, onSubmit,
                 value={form.compareAtPrice}
                 onChange={(e) => set('compareAtPrice', e.target.value)}
                 error={errors.compareAtPrice}
-                hint="Optional. Shown struck through when higher than the base price."
+                hint="Optional. Shown crossed out when higher than the selling price."
               />
               <PricePreview base={basePrice} original={num(form.compareAtPrice)} />
               <TextField
@@ -778,7 +782,7 @@ export function DuplicateProductDialog({
               off: product.images.length === 0,
             },
             {
-              label: 'Original price',
+              label: 'Regular price / MRP',
               detail: product.extensions.compareAtPrice !== null ? formatBDT(product.extensions.compareAtPrice) : 'None set',
               checked: includePricing,
               set: setIncludePricing,

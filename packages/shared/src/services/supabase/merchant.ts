@@ -197,6 +197,7 @@ export function createMerchant(ctx: AdapterContext, auth: AuthModule) {
 
   async function ordersOf(storeId: string, filters: import('../../types').OrderListFilters = {}): Promise<{ items: Order[]; total: number }> {
     let query = sb.from('orders').select(ORDER_COLUMNS, { count: 'exact' }).eq('store_id', storeId);
+    if (!filters.includeTest) query = query.eq('is_test', false);
     if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
     if (filters.paymentStatus && filters.paymentStatus !== 'all') query = query.eq('payment_status', filters.paymentStatus);
     if (filters.paymentMethod && filters.paymentMethod !== 'all') query = query.eq('payment_method', filters.paymentMethod);
@@ -559,12 +560,18 @@ export function createMerchant(ctx: AdapterContext, auth: AuthModule) {
       },
       async countsByStatus() {
         const store = await myStore();
-        const rows = await ctx.q<{ status: OrderStatus }[]>(sb.from('orders').select('status').eq('store_id', store.id).limit(100000));
+        const rows = await ctx.q<{ status: OrderStatus }[]>(sb.from('orders').select('status').eq('store_id', store.id).eq('is_test', false).limit(100000));
         const counts = { all: rows.length, pending: 0, confirmed: 0, processing: 0, shipped: 0, out_for_delivery: 0, delivered: 0, cancelled: 0 } as Record<OrderStatus | 'all', number>;
         for (const r of rows) counts[r.status] += 1;
         return counts;
       },
       get: (id) => orderDetail(id),
+      async markAsTest(id, reason) {
+        const cleanReason = reason.normalize('NFC').trim();
+        if (cleanReason.length < 5 || cleanReason.length > 300) throw new ServiceError('VALIDATION', 'Add a reason between 5 and 300 characters.');
+        await ctx.rpc('mark_order_as_test', { p_order_id: id, p_reason: cleanReason });
+        return await orderDetail(id);
+      },
       async updateStatus(id, to, { note, idempotencyKey }) {
         await ctx.invoke('update-order-status', { orderId: id, toStatus: to, note: note || undefined, idempotencyKey });
         return await orderDetail(id);
@@ -586,8 +593,9 @@ export function createMerchant(ctx: AdapterContext, auth: AuthModule) {
         const rows = await ctx.q<Row[]>(
           sb
             .from('delivery_events')
-            .select('event_type, notes, cod_amount, created_at, order:orders!inner(order_number, store_id, delivery_address, order_phone)')
+            .select('event_type, notes, cod_amount, created_at, order:orders!inner(order_number, store_id, delivery_address, order_phone, is_test)')
             .eq('order.store_id', store.id)
+            .eq('order.is_test', false)
             .gte('created_at', `${range.from.slice(0, 10)}T00:00:00+06:00`)
             .lte('created_at', `${range.to.slice(0, 10)}T23:59:59.999+06:00`)
             .order('created_at'),

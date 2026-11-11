@@ -86,8 +86,16 @@ export function readableOn(hex: string): string {
   return 1.05 / (L + 0.05) >= 4.5 ? '#ffffff' : '#0f1d2e';
 }
 
-export function storeStyle(store: Pick<StorefrontStore, 'brandColour'>): CSSProperties {
-  return { '--store': store.brandColour, '--store-ink': readableOn(store.brandColour) } as CSSProperties;
+export function storeStyle(store: Pick<StorefrontStore, 'brandColour' | 'themeAccent'>): CSSProperties {
+  return {
+    '--store': store.brandColour,
+    '--store-ink': readableOn(store.brandColour),
+    '--store-theme-accent': store.themeAccent ?? store.brandColour,
+  } as CSSProperties;
+}
+
+function storeThemeKey(name: string | null): string {
+  return (name ?? 'default').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'default';
 }
 
 export function StoreUnavailable({ message }: { message?: string }) {
@@ -136,7 +144,7 @@ export function StoreShell({ subdomain, children }: { subdomain: string; childre
   if (state.error || !state.data) return <StoreUnavailable message={state.error ?? undefined} />;
   return (
     <StoreCtx.Provider value={state.data}>
-      <div className="flex min-h-dvh flex-col bg-canvas" style={storeStyle(state.data)}>
+      <div className="storefront-shell flex min-h-dvh flex-col bg-canvas" data-store-theme={storeThemeKey(state.data.themeName)} style={storeStyle(state.data)}>
         <StoreHeader />
         <div className="flex-1">{children}</div>
         <StoreFooter />
@@ -327,7 +335,7 @@ export function ProductCard({ product, categoryName }: { product: Product; categ
   const comparing = compareIds.includes(product.id);
   const { percentOff } = displayPrice(product);
   return (
-    <div className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-line bg-white transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)]">
+    <div className="storefront-product-card group relative flex w-full flex-col overflow-hidden border border-line bg-white transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-pop)]">
       <Link href={p.product(store.subdomain, productSlug(product))} className="flex flex-1 flex-col">
         <div className="relative aspect-square">
           <ProductArt
@@ -367,6 +375,44 @@ export function ProductCard({ product, categoryName }: { product: Product; categ
         {comparing ? <Check className="size-3.5" aria-hidden /> : <GitCompareArrows className="size-3.5" aria-hidden />}
         <span className="sr-only sm:not-sr-only">{comparing ? 'Comparing' : 'Compare'}</span>
       </button>
+      <div className="storefront-product-actions px-3 pb-3">
+        {product.productType === 'variant' ? (
+          <Link
+            href={p.product(store.subdomain, productSlug(product))}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--store)] px-3 text-sm font-bold text-[var(--store)] transition hover:bg-[var(--store)] hover:text-[var(--store-ink)]"
+          >
+            Choose options <ChevronRight className="size-4" aria-hidden />
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={stock === 'out_of_stock' || total <= 0}
+            onClick={() => {
+              const result = cartStore.add(
+                { id: store.id, subdomain: store.subdomain, name: store.name },
+                {
+                  productId: product.id,
+                  slug: productSlug(product),
+                  variantId: null,
+                  name: product.name,
+                  variantLabel: null,
+                  imageUrl: primaryImage(product),
+                  categoryName: categoryName ?? null,
+                  unitPrice: product.basePrice,
+                  quantity: 1,
+                },
+                total,
+              );
+              if (result.capped) toast.info('Stock limit', `Only ${total} available — your cart now has ${result.quantity}.`);
+              else toast.success('Added to cart', `${product.name} added to your cart.`);
+            }}
+            className="storefront-add-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[var(--store)] px-3 text-sm font-bold text-[var(--store-ink)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <ShoppingCart className="size-4" aria-hidden />
+            {stock === 'out_of_stock' || total <= 0 ? 'Sold out' : 'Add to cart'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -476,7 +522,7 @@ export function StoreHome() {
 
   return (
     <main>
-      <section className="relative overflow-hidden bg-[var(--store)] text-[var(--store-ink)]">
+      <section className="storefront-hero relative overflow-hidden bg-[var(--store)] text-[var(--store-ink)]">
         <div
           className="absolute inset-0 opacity-[0.12]"
           aria-hidden
@@ -488,12 +534,12 @@ export function StoreHome() {
         <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-8 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:py-16">
           <div>
             {store.category && <p className="text-[12px] font-semibold uppercase tracking-[0.14em] opacity-80">{STORE_CATEGORY_LABEL[store.category]}</p>}
-            <h1 className="mt-2 text-3xl font-extrabold leading-tight sm:text-4xl">{store.name}</h1>
+            <h1 className="storefront-hero-title mt-2 text-3xl font-extrabold leading-tight sm:text-4xl">{store.name}</h1>
             {store.tagline && <p className="mt-3 max-w-md text-base opacity-90">{store.tagline}</p>}
             <div className="mt-6 flex flex-wrap gap-2">
               <Link
                 href={p.storeProducts(store.subdomain)}
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-ink shadow-sm hover:bg-white/90"
+                className="storefront-hero-cta inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-ink shadow-sm hover:bg-white/90"
               >
                 Shop all products <ChevronRight className="size-4" aria-hidden />
               </Link>

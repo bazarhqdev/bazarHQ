@@ -14,9 +14,8 @@ export default function PaymentSettingsPage() {
       <title>Payment settings · BazarHQ Merchant</title>
       <PageHeader title="Payment settings" description="Choose how customers can pay. Changes apply to new orders only." />
       <div className="space-y-4">
-        <Alert tone="info" title="Sandbox mode">
-          BazarHQ is in development, so only sandbox/test credentials are accepted. Credentials are validated and encrypted by a secure server function; this
-          page never stores or displays them.
+        <Alert tone="info" title="Academic sandbox testing">
+          Use provider-issued sandbox credentials for testing; sandbox transactions do not move real money. Live payments remain locked until the provider approves your merchant account. Cash on Delivery needs no credentials.
         </Alert>
         {configs.data && enabled === 0 && (
           <Alert tone="warning" title="No payment method enabled">

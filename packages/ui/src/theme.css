@@ -1,10 +1,40 @@
+/* Noto Sans Bengali is bundled (SIL Open Font License) so Bangla text renders consistently on Web and Android. */
+@font-face {
+  font-family: 'Noto Sans Bengali';
+  src: url('./fonts/NotoSansBengali-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans Bengali';
+  src: url('./fonts/NotoSansBengali-Medium.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans Bengali';
+  src: url('./fonts/NotoSansBengali-SemiBold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans Bengali';
+  src: url('./fonts/NotoSansBengali-Bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 /*
  * BazarHQ design tokens (Tailwind v4 @theme) — shared by web and mobile.
  * Deep navy + emerald on white and soft neutral surfaces.
  * Text/background pairs used by components meet WCAG AA (4.5:1) for body text.
  */
 @theme {
-  --font-sans: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Noto Sans Bengali', 'Nirmala UI', 'Vrinda', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* Navy — primary actions, sidebar, headings */
   --color-navy-50: #eef3f9;
@@ -95,6 +125,17 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+  input,
+  textarea {
+    font-kerning: normal;
+    font-variant-ligatures: normal;
+  }
   :focus-visible {
     outline: 2px solid var(--color-brand-600);
     outline-offset: 2px;
@@ -115,4 +156,70 @@
 
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Storefront theme renderer                                           */
+/* Theme selection changes layout treatment as well as the accent.     */
+/* ------------------------------------------------------------------ */
+.storefront-shell .storefront-hero {
+  transition: background 180ms ease, color 180ms ease;
+}
+.storefront-shell .storefront-product-card {
+  border-radius: 1rem;
+  transition: border-radius 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+.storefront-shell[data-store-theme='modern'] .storefront-hero {
+  background: linear-gradient(128deg, var(--store-theme-accent) 0%, #0b1f3a 100%);
+}
+.storefront-shell[data-store-theme='modern'] .storefront-product-card {
+  border-radius: 1.5rem;
+  box-shadow: 0 8px 28px -20px rgb(15 29 46 / 0.45);
+}
+.storefront-shell[data-store-theme='minimal'] .storefront-hero {
+  --store-ink: #0f1d2e;
+  color: #0f1d2e;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.storefront-shell[data-store-theme='minimal'] .storefront-hero > div:first-child {
+  opacity: 0.035;
+}
+.storefront-shell[data-store-theme='minimal'] .storefront-product-card {
+  border-radius: 0.4rem;
+  box-shadow: none;
+}
+.storefront-shell[data-store-theme='grocery'] .storefront-hero {
+  --store-ink: #14532d;
+  color: #14532d;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+.storefront-shell[data-store-theme='grocery'] .storefront-product-card {
+  border-color: #bbf7d0;
+  border-radius: 1.1rem;
+}
+.storefront-shell[data-store-theme='grocery'] .storefront-add-button {
+  border-radius: 999px;
+}
+.storefront-shell[data-store-theme='fashion'] .storefront-hero {
+  --store-ink: #ffffff;
+  color: #ffffff;
+  background: linear-gradient(120deg, #111827 0%, var(--store-theme-accent) 100%);
+}
+.storefront-shell[data-store-theme='fashion'] .storefront-hero-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+.storefront-shell[data-store-theme='fashion'] .storefront-product-card {
+  border-radius: 0.25rem;
+  border-color: #e5e7eb;
+  box-shadow: none;
+}
+.storefront-shell[data-store-theme='fashion'] .storefront-product-actions a,
+.storefront-shell[data-store-theme='fashion'] .storefront-add-button {
+  border-radius: 0.25rem;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
 }

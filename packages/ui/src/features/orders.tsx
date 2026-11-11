@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Ban, Banknote, CheckCircle2, Circle, Clock } from 'lucide-react';
+import { Ban, Banknote, CheckCircle2, Circle, Clock, FlaskConical } from 'lucide-react';
 import {
   canCancelOrder,
   canRecordCodCollection,
@@ -26,7 +26,7 @@ import {
 import { cn } from '../cn';
 import { useServices } from '../context';
 import { Modal, useToast } from '../components';
-import { Alert, Button, Checkbox, TextArea, TextField } from '../components';
+import { Alert, Badge, Button, Checkbox, TextArea, TextField } from '../components';
 import { ProductThumb } from '../components';
 
 /** Canonical timeline: forward path with timestamps from delivery_events, cancellation shown separately (FR-C-24). */
@@ -140,6 +140,78 @@ export function OrderItemsList({ order }: { order: Order }) {
         </div>
       </dl>
     </div>
+  );
+}
+
+
+
+/** One-way academic test marker. It never changes payment/order state or deletes financial records. */
+export function MarkTestOrder({ detail, onChange, compact }: { detail: OrderDetail; onChange: (d: OrderDetail) => void; compact?: boolean }) {
+  const services = useServices();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('Academic project test — no real money was received.');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { order } = detail;
+
+  if (order.isTest) {
+    return (
+      <div className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="warning"><FlaskConical className="size-3" aria-hidden /> Academic test order</Badge>
+          <span className="text-[12px] font-medium text-amber-900">Excluded from sales and GMV analytics</span>
+        </div>
+        {order.testReason && <p className="text-[12.5px] text-amber-900">Reason: {order.testReason}</p>}
+        {order.paymentStatus === 'cod_collected' && (
+          <p className="text-[12px] text-amber-900">This is a test marker only. The recorded COD/payment history has not been changed and does not prove real cash was received.</p>
+        )}
+      </div>
+    );
+  }
+
+  async function submit() {
+    const clean = reason.normalize('NFC').trim();
+    if (clean.length < 5 || clean.length > 300) {
+      setError('Add a reason between 5 and 300 characters.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await services.orders.markAsTest(order.id, clean);
+      onChange(updated);
+      toast.success('Order marked as test', 'It will be excluded from merchant sales and GMV analytics. Payment and audit history remain unchanged.');
+      setOpen(false);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Button variant="secondary" size={compact ? 'sm' : 'md'} block={compact} icon={<FlaskConical className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+        Mark as academic test
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => !busy && setOpen(false)}
+        title="Mark this order as a test?"
+        description="This is a one-way label for academic/testing records. The order and payment history will not be deleted or changed. The order will be excluded from merchant sales and GMV analytics."
+        busy={busy}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)} disabled={busy}>Keep as real order</Button>
+            <Button variant="brand" loading={busy} onClick={() => void submit()}>Mark as test</Button>
+          </>
+        }
+      >
+        {error && <Alert tone="danger">{error}</Alert>}
+        <TextArea label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} rows={3} hint="For example: Academic project test; no real cash was collected." />
+      </Modal>
+    </>
   );
 }
 

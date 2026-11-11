@@ -115,7 +115,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
   function deriveCustomers(storeId: string): StoreCustomer[] {
     const map = new Map<string, StoreCustomer>();
     const t = now().getTime();
-    const orders = ctx.db.orders.filter((o) => o.storeId === storeId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const orders = ctx.db.orders.filter((o) => o.storeId === storeId && !o.isTest).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const o of orders) {
       const id = o.customerId ?? `guest:${o.orderPhone}`;
       const c = map.get(id);
@@ -416,7 +416,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
       getDeletionPrecheck: () =>
         read(() => {
           const store = myStore();
-          const pendingOrders = store ? ctx.db.orders.filter((o) => o.storeId === store.id && o.status !== 'delivered' && o.status !== 'cancelled').length : 0;
+          const pendingOrders = store ? ctx.db.orders.filter((o) => o.storeId === store.id && !o.isTest && o.status !== 'delivered' && o.status !== 'cancelled').length : 0;
           return { pendingOrders };
         }),
 
@@ -653,7 +653,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
             createdAt: t,
             updatedAt: t,
             deletedAt: null,
-            extensions: { sku: data.sku.trim() || null, compareAtPrice: data.compareAtPrice ?? null },
+            extensions: { sku: data.sku.trim() || `BHQ-${pid.replace(/[^a-z0-9]/gi, '').slice(-10).toUpperCase()}`, compareAtPrice: data.compareAtPrice ?? null },
           };
           ctx.db.products.push(p);
           const initial =
@@ -699,7 +699,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
           p.basePrice = data.basePrice;
           p.lowStockThreshold = data.lowStockThreshold;
           p.status = data.status;
-          p.extensions = { sku: data.sku.trim() || null, compareAtPrice: data.compareAtPrice ?? null };
+          p.extensions = { sku: data.sku.trim() || `BHQ-${p.id.replace(/[^a-z0-9]/gi, '').slice(-10).toUpperCase()}`, compareAtPrice: data.compareAtPrice ?? null };
           p.images = data.images.map((img, i) => ({
             id: img.id ?? newId('img0'),
             productId: p.id,
@@ -795,7 +795,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
             createdAt: t,
             updatedAt: t,
             deletedAt: null,
-            extensions: { sku, compareAtPrice: options.includePricing === false ? null : (src.extensions.compareAtPrice ?? null) },
+            extensions: { sku: sku ?? `BHQ-${pid.replace(/[^a-z0-9]/gi, '').slice(-10).toUpperCase()}`, compareAtPrice: options.includePricing === false ? null : (src.extensions.compareAtPrice ?? null) },
           };
           ctx.db.products.push(copy);
           return stripProduct(copy);
@@ -923,6 +923,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
           const q = filters.search?.trim().toLowerCase();
           const items = ctx.db.orders
             .filter((o) => o.storeId === store.id)
+            .filter((o) => filters.includeTest === true || !o.isTest)
             .filter((o) => !filters.status || filters.status === 'all' || o.status === filters.status)
             .filter((o) => !filters.paymentStatus || filters.paymentStatus === 'all' || o.paymentStatus === filters.paymentStatus)
             .filter((o) => !filters.paymentMethod || filters.paymentMethod === 'all' || o.paymentMethod === filters.paymentMethod)
@@ -938,7 +939,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
           const store = requireStore();
           const out: Record<string, number> = { all: 0, pending: 0, confirmed: 0, processing: 0, shipped: 0, out_for_delivery: 0, delivered: 0, cancelled: 0 };
           for (const o of ctx.db.orders) {
-            if (o.storeId !== store.id) continue;
+            if (o.storeId !== store.id || o.isTest) continue;
             out.all = (out.all ?? 0) + 1;
             out[o.status] = (out[o.status] ?? 0) + 1;
           }
@@ -946,6 +947,23 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
         }, 0.5),
 
       get: (id) => read(() => orderDetail(ownedOrder(id))),
+
+      markAsTest: (id, reason) =>
+        write(() => {
+          const u = requireMerchant();
+          const o = ownedOrder(id);
+          const cleanReason = reason.normalize('NFC').trim();
+          if (cleanReason.length < 5 || cleanReason.length > 300) {
+            throw new ServiceError('VALIDATION', 'Add a reason between 5 and 300 characters.', { reason: 'Add a reason between 5 and 300 characters.' });
+          }
+          if (!o.isTest) {
+            o.isTest = true;
+            o.testReason = cleanReason;
+            o.testMarkedAt = nowIso();
+            ctx.audit(u, 'order.marked_test', 'order', o.id, { order: o.orderNumber, reason: cleanReason });
+          }
+          return orderDetail(o);
+        }, 0.8),
 
       updateStatus: (id, to, { note, idempotencyKey }) =>
         write(() => {
@@ -1131,7 +1149,7 @@ export function createMerchantServices(ctx: MockContext): Omit<MerchantServices,
               ?.createdAt.slice(0, 16)
               .replace('T', ' ') ?? null;
           for (const o of ctx.db.orders
-            .filter((x) => x.storeId === store.id && ['shipped', 'out_for_delivery', 'delivered'].includes(x.status))
+            .filter((x) => x.storeId === store.id && !x.isTest && ['shipped', 'out_for_delivery', 'delivered'].includes(x.status))
             .filter((x) => x.createdAt.slice(0, 10) >= range.from && x.createdAt.slice(0, 10) <= range.to)
             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
             rows.push([

@@ -311,6 +311,10 @@ export interface Order {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  /** Internal academic/test marker. Test orders stay auditable but are excluded from business analytics. */
+  isTest: boolean;
+  testReason: string | null;
+  testMarkedAt: ISODateString | null;
   subtotal: Money;
   deliveryCharge: Money;
   totalAmount: Money;
@@ -384,6 +388,8 @@ export interface OrderListFilters {
   search?: string;
   from?: ISODateString;
   to?: ISODateString;
+  /** Include academic/test orders in the merchant list. Defaults to false. */
+  includeTest?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -405,7 +411,7 @@ export interface PaymentConfig {
   credentialHint: string | null;
   environment: 'sandbox' | 'live';
   validation: CredentialValidation;
-  updatedAt: ISODateString;
+  updatedAt: ISODateString | null;
 }
 
 export interface BkashCredentials {
@@ -877,6 +883,7 @@ export interface StorefrontStore {
   brandColour: string;
   themeId: UUID | null;
   themeName: string | null;
+  themeAccent: string | null;
   category: StoreCategory | null;
   returnWindowDays: number;
   shipping: ShippingSettings;

@@ -49,9 +49,10 @@ const FIELDS: Record<CredentialMethod, { key: string; label: string; secret?: bo
 
 const validationBadge = (c: PaymentConfig) => {
   if (c.method === 'cod') return <Badge tone="neutral">No credentials needed</Badge>;
-  if (c.validation === 'valid') return <Badge tone="success">Verified · {c.credentialHint}</Badge>;
   if (c.validation === 'invalid') return <Badge tone="danger">Verification failed</Badge>;
-  return <Badge tone="warning">Not configured</Badge>;
+  if (c.validation === 'valid') return <Badge tone="success">Verified · {c.credentialHint}</Badge>;
+  if (c.hasCredentials) return <Badge tone="warning">Credentials saved · verification pending</Badge>;
+  return <Badge tone="neutral">Not configured</Badge>;
 };
 
 export function PaymentMethodCard({ config, onChange }: { config: PaymentConfig; onChange: (c: PaymentConfig) => void }) {
@@ -81,16 +82,27 @@ export function PaymentMethodCard({ config, onChange }: { config: PaymentConfig;
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-[15px] font-bold text-ink">{label}</h3>
-            {config.method !== 'cod' && <Badge tone="info">Sandbox</Badge>}
+            {config.method !== 'cod' && <Badge tone={config.environment === 'live' ? 'success' : 'info'}>{config.environment === 'live' ? 'Live' : 'Sandbox'}</Badge>}
           </div>
           <p className="mt-0.5 text-[13px] text-ink-muted">{PAYMENT_METHOD_DESCRIPTION[config.method]}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {validationBadge(config)}
-            <span className="text-[12px] text-ink-subtle">Updated {formatRelative(config.updatedAt)}</span>
+            {config.updatedAt ? (
+              <span className="text-[12px] text-ink-subtle">Updated {formatRelative(config.updatedAt)}</span>
+            ) : config.method === 'cod' ? (
+              <span className="text-[12px] text-ink-subtle">No credentials needed</span>
+            ) : (
+              <span className="text-[12px] text-ink-subtle">Not configured</span>
+            )}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Switch checked={config.isEnabled} onChange={(v) => void toggle(v)} disabled={toggling} label={`Accept ${label}`} />
+          <Switch
+            checked={config.isEnabled}
+            onChange={(v) => void toggle(v)}
+            disabled={toggling || (config.method !== 'cod' && (!config.hasCredentials || config.validation === 'invalid'))}
+            label={`Accept ${label}`}
+          />
           <span className="text-[12px] font-semibold text-ink-muted">{config.isEnabled ? 'On' : 'Off'}</span>
         </div>
       </div>
@@ -113,8 +125,10 @@ export function PaymentMethodCard({ config, onChange }: { config: PaymentConfig;
             onChange(c);
             if (c.validation === 'invalid') {
               toast.error(`${label} turned off`, 'We couldn’t verify these credentials. Check them and try again.');
-            } else {
+            } else if (c.validation === 'valid') {
               toast.success(`${label} credentials verified`, 'You can now enable this method.');
+            } else {
+              toast.success(`${label} credentials saved`, 'Provider verification is pending. Enable this method only after completing the provider’s sandbox setup.');
             }
           }}
         />
@@ -175,7 +189,7 @@ function CredentialsModal({
       onClose={close}
       busy={busy}
       title={`${PAYMENT_METHOD_LABEL[method]} sandbox credentials`}
-      description="Use sandbox/test credentials during development. Live credentials are enabled only after production approval."
+      description="Use test credentials issued by the provider for academic testing. Sandbox transactions do not move real money. Live payments stay locked until the provider approves your merchant account."
       footer={
         <>
           <Button variant="secondary" onClick={close} disabled={busy}>
@@ -226,7 +240,7 @@ function CredentialsModal({
           />
         ))}
         <p className="text-[12.5px] text-ink-subtle">
-          Credentials are sent over TLS to a BazarHQ server function that validates and encrypts them. Only the last 4 characters are ever shown back.
+          Credentials are sent over TLS to a BazarHQ server function and encrypted at rest. Secret values are never returned to the app; only a masked hint may be shown.
         </p>
       </form>
     </Modal>

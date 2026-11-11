@@ -11,6 +11,7 @@ import {
   ErrorState,
   OrderActions,
   OrderItemsList,
+  MarkTestOrder,
   OrderStatusBadge,
   OrderTimeline,
   PageHeader,
@@ -61,6 +62,7 @@ export default function OrderDetailPage() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5">
             <Card>
+              <div className="p-5 pb-0"><MarkTestOrder detail={d} onChange={(nd) => detail.setData(nd)} /></div>
               <CardHeader title="Update status" description="Only the next valid step is offered. Every change is recorded and the customer is notified." />
               <div className="px-5 pb-5">
                 <OrderActions detail={d} onChange={(nd) => detail.setData(nd)} />

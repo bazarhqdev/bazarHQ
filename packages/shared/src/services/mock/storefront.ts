@@ -158,7 +158,7 @@ export function createStorefrontServices(ctx: MockContext): { storefront: Storef
         const q = filters.search?.trim().toLowerCase();
         const sales = new Map<string, number>();
         for (const o of ctx.db.orders)
-          if (o.storeId === s.id && o.status !== 'cancelled') for (const it of o.items) sales.set(it.productId, (sales.get(it.productId) ?? 0) + it.quantity);
+          if (o.storeId === s.id && !o.isTest && o.status !== 'cancelled') for (const it of o.items) sales.set(it.productId, (sales.get(it.productId) ?? 0) + it.quantity);
         const list = visibleProducts(s.id)
           .filter((p) => !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
           .filter((p) => !filters.categoryId || filters.categoryId === 'all' || p.categoryId === filters.categoryId)
@@ -334,6 +334,9 @@ export function createStorefrontServices(ctx: MockContext): { storefront: Storef
           status: 'pending',
           paymentMethod: input.paymentMethod,
           paymentStatus: input.paymentMethod === 'cod' ? 'cod_pending' : 'pending',
+          isTest: false,
+          testReason: null,
+          testMarkedAt: null,
           subtotal,
           deliveryCharge: charge,
           totalAmount: subtotal + charge,

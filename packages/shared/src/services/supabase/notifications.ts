@@ -10,6 +10,8 @@
  *   everyone     notifications  (user_id = me)       new orders, low stock, ticket replies, admin alerts
  *   merchant     orders         (store_id = my store) new orders and status changes
  *                support_tickets(store_id = my store) ticket updates
+ *                products/categories/variants/inventory_movements/stores
+ *                (store-scoped RLS) catalogue, stock, theme and store changes across Web + Android
  *   customer     orders         (customer_id = me)    order tracking
  *                support_tickets(customer_id = me)
  *                returns        (customer_id = me)
@@ -40,9 +42,18 @@ export function createNotifications(ctx: AdapterContext, auth: AuthModule) {
     const s = await auth.buildSession();
     if (!s || s.user.id === 'pending-verification') return [];
     const me = s.user.id;
-    const subs: { table: string; filter: string }[] = [{ table: 'notifications', filter: `user_id=eq.${me}` }];
+    const subs: { table: string; filter?: string }[] = [{ table: 'notifications', filter: `user_id=eq.${me}` }];
     if (s.user.role === 'merchant' && s.store) {
-      subs.push({ table: 'orders', filter: `store_id=eq.${s.store.id}` }, { table: 'support_tickets', filter: `store_id=eq.${s.store.id}` });
+      subs.push(
+        { table: 'orders', filter: `store_id=eq.${s.store.id}` },
+        { table: 'support_tickets', filter: `store_id=eq.${s.store.id}` },
+        { table: 'products', filter: `store_id=eq.${s.store.id}` },
+        { table: 'categories', filter: `store_id=eq.${s.store.id}` },
+        { table: 'stores', filter: `id=eq.${s.store.id}` },
+        // Variants and inventory movements are tenant-scoped through product/store RLS.
+        { table: 'product_variants' },
+        { table: 'inventory_movements', filter: `store_id=eq.${s.store.id}` },
+      );
     } else if (s.user.role === 'customer') {
       subs.push(
         { table: 'orders', filter: `customer_id=eq.${me}` },
@@ -54,7 +65,7 @@ export function createNotifications(ctx: AdapterContext, auth: AuthModule) {
     }
     const channel = sb.channel(`bazarhq:${me}:${Date.now().toString(36)}`);
     for (const sub of subs) {
-      channel.on('postgres_changes' as never, { event: '*', schema: 'public', table: sub.table, filter: sub.filter } as never, () => onChange());
+      channel.on('postgres_changes' as never, { event: '*', schema: 'public', table: sub.table, ...(sub.filter ? { filter: sub.filter } : {}) } as never, () => onChange());
     }
     channel.subscribe();
     return [channel];

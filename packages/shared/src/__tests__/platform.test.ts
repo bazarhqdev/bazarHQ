@@ -338,6 +338,19 @@ describe('super admin (§12)', () => {
 });
 
 describe('security invariants from the brief', () => {
+  it('marks academic test orders without changing payment status and hides them from merchant analytics lists', async () => {
+    await s.auth.signIn('merchant@bazarhq.test', 'Merchant123');
+    const before = await s.orders.list();
+    const candidate = before.items.find((order) => !order.isTest)!;
+    const paymentStatus = candidate.paymentStatus;
+    const marked = await s.orders.markAsTest(candidate.id, 'Academic project test; no real money was received.');
+    assert.equal(marked.order.isTest, true);
+    assert.equal(marked.order.paymentStatus, paymentStatus);
+    assert.equal(marked.order.testReason, 'Academic project test; no real money was received.');
+    assert.equal((await s.orders.list()).items.some((order) => order.id === candidate.id), false);
+    assert.equal((await s.orders.list({ includeTest: true })).items.some((order) => order.id === candidate.id), true);
+  });
+
   it('blocks invalid order transitions server-side', async () => {
     await s.auth.signIn('merchant@bazarhq.test', 'Merchant123');
     const { items } = await s.orders.list({ status: 'pending' });
@@ -398,6 +411,35 @@ describe('security invariants from the brief', () => {
 });
 
 describe('product duplicate (FR-M-19)', () => {
+  it('auto-generates a unique SKU when the optional SKU field is blank', async () => {
+    await s.auth.signIn('merchant@bazarhq.test', 'Merchant123');
+    const categoryId = (await s.products.list()).find(
+  (p) => p.productType === 'simple' && p.categoryId !== null,
+)?.categoryId;
+
+if (!categoryId) {
+  throw new Error(
+    'SKU generation test requires a simple product with a category.',
+  );
+}
+
+const created = await s.products.create({
+  name: 'বাংলা পরীক্ষামূলক পণ্য',
+  description: 'A product created to verify Bengali Unicode and automatic SKU generation.',
+  categoryId,
+      basePrice: 125,
+      compareAtPrice: null,
+      productType: 'simple',
+      stockQuantity: 3,
+      lowStockThreshold: 1,
+      status: 'draft',
+      sku: '',
+      variants: [],
+      images: [],
+    });
+    assert.match(created.extensions.sku ?? '', /^BHQ-[A-F0-9]{10}$/);
+  });
+
   it('creates a draft copy with stock 0, a unique SKU and the chosen parts', async () => {
     await s.auth.signIn('merchant@bazarhq.test', 'Merchant123');
     const src = (await s.products.list()).find((p) => p.extensions.compareAtPrice !== null && p.productType === 'simple')!;
