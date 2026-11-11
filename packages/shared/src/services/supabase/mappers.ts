@@ -82,6 +82,7 @@ export function mapStorefrontStore(r: Row, urls: { logo?: string | null; banner?
     brandColour: r.brand_colour,
     themeId: r.theme_id ?? null,
     themeName: r.theme_name ?? null,
+    themeAccent: r.theme_accent ?? null,
     category: r.category ?? null,
     returnWindowDays: num(r.return_window_days),
     shipping: {
@@ -146,7 +147,7 @@ export function mapProduct(r: Row, urls: Map<string, string>): Product {
 
 export const ORDER_COLUMNS =
   'id, order_number, store_id, customer_id, order_phone, order_email, status, payment_method, payment_status, subtotal, delivery_charge, total_amount, currency, ' +
-  'delivery_address, cancellation_reason, created_at, updated_at, delivered_at, ' +
+  'delivery_address, cancellation_reason, is_test, test_reason, test_marked_at, created_at, updated_at, delivered_at, ' +
   'order_items(id, order_id, product_id, variant_id, product_name, variant_label, quantity, unit_price, subtotal, created_at)';
 
 export function mapDeliveryAddress(a: Row | null | undefined, phone: string): DeliveryAddress {
@@ -187,6 +188,9 @@ export function mapOrder(r: Row, items?: Row[]): Order {
     status: r.status,
     paymentMethod: r.payment_method,
     paymentStatus: r.payment_status,
+    isTest: r.is_test === true,
+    testReason: r.test_reason ?? null,
+    testMarkedAt: r.test_marked_at ?? null,
     subtotal: num(r.subtotal),
     deliveryCharge: num(r.delivery_charge),
     totalAmount: num(r.total_amount),
@@ -243,7 +247,7 @@ export function mapPaymentConfig(r: Row): PaymentConfig {
     credentialHint: r.credential_hint ? `••••${String(r.credential_hint).slice(-4)}` : null,
     environment: r.environment === 'live' ? 'live' : 'sandbox',
     validation: r.validation ?? (r.method === 'cod' ? 'not_required' : 'unverified'),
-    updatedAt: r.updated_at ?? new Date(0).toISOString(),
+    updatedAt: r.updated_at ?? null,
   };
 }
 

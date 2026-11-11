@@ -376,5 +376,19 @@ export function useServiceEvents(callback: () => void) {
   useEffect(() => {
     ref.current = callback;
   });
-  useEffect(() => services.notifications.subscribe(() => ref.current()), [services]);
+  useEffect(() => {
+    const unsubscribe = services.notifications.subscribe(() => ref.current());
+    // Revalidate after a tab/WebView returns to the foreground. Realtime keeps
+    // both clients live while connected; this catches changes made while asleep.
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') ref.current();
+    };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+    return () => {
+      unsubscribe();
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
+  }, [services]);
 }

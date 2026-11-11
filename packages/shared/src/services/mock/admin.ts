@@ -221,8 +221,8 @@ export function createAdminServices(ctx: MockContext): { adminAuth: AdminAuthSer
         const actor = requireAdmin();
         sweepScheduled(actor);
         const prev = previousRange(range);
-        const cur = ctx.db.orders.filter((o) => inRange(o.createdAt, range));
-        const before = ctx.db.orders.filter((o) => inRange(o.createdAt, prev));
+        const cur = ctx.db.orders.filter((o) => !o.isTest && inRange(o.createdAt, range));
+        const before = ctx.db.orders.filter((o) => !o.isTest && inRange(o.createdAt, prev));
         const merchants = ctx.db.users.filter((u) => u.profile.role === 'merchant' && u.profile.status !== 'deleted');
         const merchantsBefore = merchants.filter((u) => u.profile.createdAt.slice(0, 10) < range.from).length;
         const customers = ctx.db.users.filter((u) => u.profile.role === 'customer' && u.profile.status === 'active');
@@ -249,7 +249,7 @@ export function createAdminServices(ctx: MockContext): { adminAuth: AdminAuthSer
           revenue: metric(revenueOf(cur), revenueOf(before)),
           customers: metric(customers.length, customersBefore),
           ordersByStatus: countByStatus(cur),
-          series: buildSeries(ctx.db.orders, range, visitorsTotal),
+          series: buildSeries(ctx.db.orders.filter((o) => !o.isTest), range, visitorsTotal),
           topMerchants: [...byStore.entries()]
             .map(([storeId, v]) => ({ storeId, storeName: storeOf(storeId)?.name ?? 'Unknown store', ...v }))
             .sort((a, b) => b.revenue - a.revenue)
@@ -440,7 +440,7 @@ export function createAdminServices(ctx: MockContext): { adminAuth: AdminAuthSer
               ownerEmail: owner.profile.email,
               themeName: ctx.db.themes.find((t) => t.id === s.themeId)?.name ?? null,
               productCount: ctx.db.products.filter((p) => p.storeId === s.id && !p.deletedAt).length,
-              orderCount: ctx.db.orders.filter((o) => o.storeId === s.id).length,
+              orderCount: ctx.db.orders.filter((o) => o.storeId === s.id && !o.isTest).length,
             };
           });
       }),

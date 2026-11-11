@@ -6,7 +6,7 @@ export function PaymentsScreen() {
   const configs = useAsync(() => services.payments.list(), []);
   return (
     <Screen title="Payment settings" back onRefresh={configs.reload}>
-      <Alert tone="info">Sandbox credentials only during development. Credentials are encrypted by a server function and never stored in the app.</Alert>
+      <Alert tone="info">Use provider-issued sandbox credentials for academic testing. Sandbox transactions do not move real money. Live payments require provider approval. Cash on Delivery needs no credentials.</Alert>
       <div className="mt-3 space-y-3">
         {configs.loading ? (
           Array.from({ length: 5 }, (_, i) => <Skeleton key={i} className="h-36 rounded-[var(--radius-card)]" />)

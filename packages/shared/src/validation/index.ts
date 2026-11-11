@@ -16,6 +16,10 @@ export const passwordSchema = z
 
 export const emailSchema = z.string().trim().min(1, 'Enter your email address.').email('Enter a valid email address.');
 
+/** Normalize composed Unicode text at validation/submit time, never per keystroke (IME-safe). */
+const nfcTrimmed = (min: number, max: number, minMessage: string, maxMessage: string) =>
+  z.string().transform((value) => value.normalize('NFC').trim()).pipe(z.string().min(min, minMessage).max(max, maxMessage));
+
 /** ASM-01: Bangladeshi 11-digit mobile number, e.g. 01306060688. */
 export const bdPhoneSchema = z
   .string()
@@ -45,7 +49,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const registerSchema = z
   .object({
-    fullName: z.string().trim().min(2, 'Enter your full name.').max(100, 'Name is too long.'),
+    fullName: nfcTrimmed(2, 100, 'Enter your full name.', 'Name is too long.'),
     email: emailSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
@@ -75,7 +79,7 @@ export const changePasswordSchema = z
   });
 
 export const profileSchema = z.object({
-  fullName: z.string().trim().min(2, 'Enter your full name.').max(100, 'Name is too long.'),
+  fullName: nfcTrimmed(2, 100, 'Enter your full name.', 'Name is too long.'),
   phone: z.union([z.literal(''), bdPhoneSchema]),
 });
 
@@ -95,22 +99,22 @@ export const subdomainSchema = z
 export const hexColourSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Pick a valid colour.');
 
 export const storeBasicsSchema = z.object({
-  name: z.string().trim().min(2, 'Enter a store name (at least 2 characters).').max(60, 'Store name is too long.'),
+  name: nfcTrimmed(2, 60, 'Enter a store name (at least 2 characters).', 'Store name is too long.'),
   subdomain: subdomainSchema,
   category: z.string().min(1, 'Choose a store category.'),
-  tagline: z.string().trim().max(120, 'Keep the tagline under 120 characters.'),
+  tagline: nfcTrimmed(0, 120, 'Enter a tagline.', 'Keep the tagline under 120 characters.'),
 });
 export type StoreBasicsInput = z.infer<typeof storeBasicsSchema>;
 
 export const storeBrandingSchema = z.object({
   themeId: z.string().min(1, 'Choose a theme.'),
   brandColour: hexColourSchema,
-  tagline: z.string().trim().max(120, 'Keep the tagline under 120 characters.'),
+  tagline: nfcTrimmed(0, 120, 'Enter a tagline.', 'Keep the tagline under 120 characters.'),
 });
 
 export const storeProfileSchema = z.object({
-  name: z.string().trim().min(2, 'Enter a store name (at least 2 characters).').max(60, 'Store name is too long.'),
-  tagline: z.string().trim().max(120, 'Keep the tagline under 120 characters.'),
+  name: nfcTrimmed(2, 60, 'Enter a store name (at least 2 characters).', 'Store name is too long.'),
+  tagline: nfcTrimmed(0, 120, 'Enter a tagline.', 'Keep the tagline under 120 characters.'),
   returnWindowDays: z
     .number({ error: 'Enter a number of days.' })
     .int('Use whole days.')
@@ -129,7 +133,7 @@ export const shippingSchema = z.object({
 
 const variantInputSchema = z.object({
   id: z.string().optional(),
-  variantLabel: z.string().trim().min(1, 'Enter a variant name, e.g. "1 kg" or "Large".').max(60, 'Too long.'),
+  variantLabel: nfcTrimmed(1, 60, 'Enter a variant name, e.g. "1 kg" or "Large".', 'Too long.'),
   priceAdjustment: z.number({ error: 'Enter a price adjustment (0 if none).' }).finite(),
   stockQuantity: z.number({ error: 'Enter stock for this variant.' }).int('Stock must be a whole number.').min(0, 'Stock cannot be negative.'),
   status: z.enum(['active', 'inactive']),
@@ -144,8 +148,8 @@ const imageInputSchema = z.object({
 
 export const productInputSchema = z
   .object({
-    name: z.string().trim().min(2, 'Enter a product name.').max(150, 'Product name is too long.'),
-    description: z.string().trim().min(10, 'Describe the product in at least 10 characters.').max(5000, 'Too long.'),
+    name: nfcTrimmed(2, 150, 'Enter a product name.', 'Product name is too long.'),
+    description: nfcTrimmed(10, 5000, 'Describe the product in at least 10 characters.', 'Too long.'),
     categoryId: z.string().min(1, 'Choose a category.'),
     basePrice: z
       .number({ error: 'Enter a price.' })
@@ -155,7 +159,7 @@ export const productInputSchema = z
     /** Original / asking price (display only). Must be higher than the base price when set. */
     compareAtPrice: z
       .number()
-      .positive('Original price must be greater than 0.')
+      .positive('Regular price must be greater than 0.')
       .max(LIMITS.maxMoney, 'Price is too large.')
       .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, 'Use at most 2 decimal places.')
       .nullable()
@@ -174,7 +178,7 @@ export const productInputSchema = z
   })
   .superRefine((p, ctx) => {
     if (p.compareAtPrice !== null && Number.isFinite(p.basePrice) && p.compareAtPrice <= p.basePrice) {
-      ctx.addIssue({ code: 'custom', path: ['compareAtPrice'], message: 'Original price must be higher than the base price, or leave it empty.' });
+      ctx.addIssue({ code: 'custom', path: ['compareAtPrice'], message: 'Regular price must be higher than the selling price, or leave it empty.' });
     }
     // FR-M-15 / DB-08 mutually exclusive stock model.
     if (p.productType === 'simple') {
@@ -214,7 +218,7 @@ export const productInputSchema = z
   });
 export type ProductInput = z.infer<typeof productInputSchema>;
 
-export const categoryNameSchema = z.string().trim().min(2, 'Enter a category name.').max(60, 'Too long.');
+export const categoryNameSchema = nfcTrimmed(2, 60, 'Enter a category name.', 'Too long.');
 
 /* ------------------------------ Inventory --------------------------- */
 
@@ -300,7 +304,7 @@ export const credentialSchemas = {
 /* -------------------------------- Support --------------------------- */
 
 export const ticketReplySchema = z.object({
-  body: z.string().trim().min(1, 'Write a reply.').max(5000, 'Reply is too long.'),
+  body: nfcTrimmed(1, 5000, 'Write a reply.', 'Reply is too long.'),
 });
 
 export const resolutionNoteSchema = z.object({
@@ -331,14 +335,14 @@ export { z };
 
 /* -------------------------------- Customer -------------------------- */
 
-const districtSchema = z.string().trim().min(2, 'Choose your district.');
+const districtSchema = nfcTrimmed(2, 80, 'Choose your district.', 'District name is too long.' );
 
 /** FR-C-14: full name, BD phone, address, district. Invalid phone blocks progression. */
 export const checkoutDeliverySchema = z.object({
-  recipientName: z.string().trim().min(2, 'Enter the recipient’s full name.').max(100, 'Name is too long.'),
+  recipientName: nfcTrimmed(2, 100, 'Enter the recipient’s full name.', 'Name is too long.'),
   phone: bdPhoneSchema,
   email: z.union([z.literal(''), emailSchema]),
-  address: z.string().trim().min(8, 'Enter the full delivery address (house, road, area).').max(300, 'Address is too long.'),
+  address: nfcTrimmed(8, 300, 'Enter the full delivery address (house, road, area).', 'Address is too long.'),
   district: districtSchema,
   postalCode: z.union([
     z.literal(''),
@@ -353,9 +357,9 @@ export type CheckoutDeliveryInput = z.infer<typeof checkoutDeliverySchema>;
 
 export const addressSchema = z.object({
   label: z.string().trim().min(2, 'Give this address a label, e.g. Home.').max(30, 'Keep the label short.'),
-  recipientName: z.string().trim().min(2, 'Enter the recipient’s name.').max(100, 'Name is too long.'),
+  recipientName: nfcTrimmed(2, 100, 'Enter the recipient’s name.', 'Name is too long.'),
   phone: bdPhoneSchema,
-  address: z.string().trim().min(8, 'Enter the full address.').max(300, 'Address is too long.'),
+  address: nfcTrimmed(8, 300, 'Enter the full address.', 'Address is too long.'),
   district: districtSchema,
   postalCode: z.union([
     z.literal(''),
@@ -401,7 +405,7 @@ export type ReturnRequestInput = z.infer<typeof returnRequestSchema>;
 export const ticketCreateSchema = z.object({
   category: z.enum(['order_issue', 'payment_issue', 'delivery_issue', 'return_refund', 'account_issue', 'other'], { error: 'Choose a category.' }),
   subject: z.string().trim().min(5, 'Write a short subject (at least 5 characters).').max(120, 'Subject is too long.'),
-  description: z.string().trim().min(20, 'Describe the issue in at least 20 characters.').max(5000, 'Too long.'),
+  description: nfcTrimmed(20, 5000, 'Describe the issue in at least 20 characters.', 'Too long.'),
   priority: z.enum(['normal', 'urgent']),
   orderId: z.string(),
 });

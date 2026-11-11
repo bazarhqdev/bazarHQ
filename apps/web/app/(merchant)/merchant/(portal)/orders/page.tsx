@@ -18,7 +18,9 @@ import {
   type PaymentStatus,
 } from '@bazarhq/shared';
 import {
+  Badge,
   Card,
+  Checkbox,
   DeliveryHistoryButton,
   EmptyState,
   ErrorState,
@@ -46,20 +48,21 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | 'all'>('all');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | 'all'>('all');
+  const [includeTest, setIncludeTest] = useState(false);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const q = useDebounced(search);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [defaultFrom] = useState(() => new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10));
   const orders = useAsync(
-    () => services.orders.list({ status, search: q, paymentStatus, paymentMethod, from: from || undefined, to: to || undefined }),
-    [status, q, paymentStatus, paymentMethod, from, to],
+    () => services.orders.list({ status, search: q, paymentStatus, paymentMethod, from: from || undefined, to: to || undefined, includeTest }),
+    [status, q, paymentStatus, paymentMethod, from, to, includeTest],
   );
   const counts = useAsync(() => services.orders.countsByStatus(), [orders.data]);
   useServiceEvents(() => void orders.reload());
 
   const list = orders.data?.items ?? [];
-  const filtered = q || paymentStatus !== 'all' || paymentMethod !== 'all' || from || to;
+  const filtered = q || paymentStatus !== 'all' || paymentMethod !== 'all' || from || to || includeTest;
 
   return (
     <>
@@ -120,6 +123,9 @@ export default function OrdersPage() {
               />
             </div>
           </div>
+          <div className="pt-1">
+            <Checkbox label="Include academic test orders" description="Test orders are hidden by default and excluded from business analytics." checked={includeTest} onChange={setIncludeTest} />
+          </div>
         </div>
         {orders.loading ? (
           <SkeletonRows rows={7} />
@@ -157,6 +163,7 @@ export default function OrdersPage() {
                         <p className="text-[12px] text-ink-subtle" title={formatDateTime(o.createdAt)}>
                           {formatRelative(o.createdAt)}
                         </p>
+                        {o.isTest && <Badge tone="warning" className="mt-1">Academic test</Badge>}
                       </td>
                       <td className={td}>
                         <p className="font-medium">{o.customerName}</p>
@@ -208,6 +215,7 @@ export default function OrdersPage() {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <OrderStatusBadge status={o.status} />
                       <PaymentStatusBadge status={o.paymentStatus} />
+                      {o.isTest && <Badge tone="warning">Academic test</Badge>}
                     </div>
                   </Link>
                 </li>

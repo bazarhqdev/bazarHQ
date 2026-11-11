@@ -176,7 +176,7 @@ export function ImageUploadField({
 
   return (
     <FieldShell id={id} label={label} hint={hint ?? 'JPG, PNG or WebP, under 2 MB.'} error={error}>
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 flex-wrap items-start gap-3">
         <div
           className={cn(
             'flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-line-strong bg-canvas',
@@ -329,7 +329,7 @@ export function StorePreview({
   themeName?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-white shadow-[var(--shadow-card)]" aria-label="Storefront preview">
+    <div className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-line bg-white shadow-[var(--shadow-card)]" aria-label="Storefront preview">
       <div className="flex items-center gap-1.5 border-b border-line bg-canvas px-3 py-2">
         <span className="size-2 rounded-full bg-red-300" aria-hidden />
         <span className="size-2 rounded-full bg-amber-300" aria-hidden />
@@ -354,19 +354,21 @@ export function StorePreview({
         <ShoppingCart className="size-4 text-ink-subtle" aria-hidden />
       </div>
       <div
-        className="mx-3 overflow-hidden rounded-lg"
+        className="relative mx-3 h-24 overflow-hidden rounded-lg"
         style={{ background: bannerUrl ? undefined : `linear-gradient(120deg, ${brandColour}, ${brandColour}cc)` }}
       >
-        {bannerUrl ? (
-          <img src={bannerUrl} alt="" className="h-24 w-full object-cover" />
-        ) : (
-          <div className="h-24 p-3 text-white">
-            <p className="text-sm font-bold leading-tight">Welcome to {name || 'your store'}</p>
-            <span className="mt-2 inline-block rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold" style={{ color: brandColour }}>
-              Shop now
-            </span>
-          </div>
+        {bannerUrl && (
+          <>
+            <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" aria-hidden />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-slate-950/20" aria-hidden />
+          </>
         )}
+        <div className="relative flex h-full flex-col items-start justify-center px-3 text-white">
+          <p className="max-w-full truncate text-sm font-bold leading-tight">{name || 'Your store'}</p>
+          <span className="mt-2 inline-block rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold" style={{ color: brandColour }}>
+            Shop now
+          </span>
+        </div>
       </div>
       <div className="grid grid-cols-3 gap-2 p-3">
         {[0, 1, 2].map((i) => (

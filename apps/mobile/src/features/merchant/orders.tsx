@@ -3,12 +3,15 @@ import { Link, useParams } from 'react-router-dom';
 import { MapPin, Phone, ShoppingBag } from 'lucide-react';
 import { formatBDT, formatDateTime, formatRelative, makeRange, ORDER_STATUS_LABEL, ORDER_STATUSES, type OrderStatus } from '@bazarhq/shared';
 import {
+  Badge,
   Card,
+  Checkbox,
   DeliveryHistoryButton,
   EmptyState,
   ErrorState,
   OrderActions,
   OrderItemsList,
+  MarkTestOrder,
   OrderStatusBadge,
   OrderTimeline,
   PaymentMethodLabel,
@@ -30,9 +33,10 @@ export function OrdersScreen() {
   const services = useServices();
   const [status, setStatus] = useState<OrderStatus | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [includeTest, setIncludeTest] = useState(false);
   const q = useDebounced(search);
   const [range] = useState(() => makeRange('90d'));
-  const orders = useAsync(() => services.orders.list({ status, search: q }), [status, q]);
+  const orders = useAsync(() => services.orders.list({ status, search: q, includeTest }), [status, q, includeTest]);
   const counts = useAsync(() => services.orders.countsByStatus(), []);
   useServiceEvents(() => {
     void orders.reload();
@@ -53,6 +57,9 @@ export function OrdersScreen() {
           ...ORDER_STATUSES.map((s) => ({ value: s, label: ORDER_STATUS_LABEL[s], count: counts.data?.[s] })),
         ]}
       />
+      <div className="mt-3">
+        <Checkbox label="Include academic test orders" description="Hidden by default; excluded from sales analytics." checked={includeTest} onChange={setIncludeTest} />
+      </div>
       <Card className="mt-3">
         {orders.loading ? (
           <SkeletonRows rows={6} />
@@ -75,6 +82,7 @@ export function OrdersScreen() {
                       <p className="text-[13px] text-ink-muted">
                         {o.customerName} · {formatRelative(o.createdAt)}
                       </p>
+                      {o.isTest && <Badge tone="warning" className="mt-1">Academic test</Badge>}
                     </div>
                     <p className="text-[15px] font-bold tabular">{formatBDT(o.totalAmount)}</p>
                   </div>
@@ -111,8 +119,12 @@ export function OrderDetailScreen() {
           <div className="flex flex-wrap gap-1.5">
             <OrderStatusBadge status={o.status} />
             <PaymentStatusBadge status={o.paymentStatus} />
+            {o.isTest && <Badge tone="warning">Academic test</Badge>}
             {d.returnRequest && <ReturnStatusBadge status={d.returnRequest.status} />}
           </div>
+          <Card className="mt-3 p-4">
+            <MarkTestOrder detail={d} onChange={(nd) => detail.setData(nd)} compact />
+          </Card>
           <Card className="mt-3 p-4">
             <p className="mb-3 text-[13px] font-semibold text-ink-muted">Update order status</p>
             <OrderActions detail={d} onChange={(nd) => detail.setData(nd)} compact />

@@ -230,6 +230,8 @@ export interface OrderService {
   list(filters?: OrderListFilters): Promise<Page<Order>>;
   countsByStatus(): Promise<Record<OrderStatus | 'all', number>>;
   get(id: string): Promise<OrderDetail>;
+  /** Academic test-data marker; preserves payment and audit history and excludes the order from business analytics. */
+  markAsTest(id: string, reason: string): Promise<OrderDetail>;
   /** API-09: canonical transition, validated server-side. */
   updateStatus(id: string, to: Exclude<OrderStatus, 'cancelled' | 'pending'>, input: { note?: string; idempotencyKey: string }): Promise<OrderDetail>;
   /** API-10: reason required; idempotent stock release. */

@@ -206,8 +206,8 @@ function SettingsBody({ store, onStore, signOut }: { store: Store; onStore: (s: 
           <Card aria-labelledby="branding-h">
             <div id="branding" className="scroll-mt-24" />
             <CardHeader id="branding-h" title="Logo & branding" description="Theme and colour changes reach your live storefront within seconds." />
-            <div className="grid grid-cols-1 gap-6 px-5 pb-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-              <div className="space-y-5">
+            <div className="grid min-w-0 grid-cols-1 gap-6 px-5 pb-5 2xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+              <div className="min-w-0 space-y-5">
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <ImageUploadField
                     label="Store logo"
@@ -230,7 +230,7 @@ function SettingsBody({ store, onStore, signOut }: { store: Store; onStore: (s: 
                 )}
                 <BrandColourPicker value={branding.brandColour} onChange={(c) => setBranding((b) => ({ ...b, brandColour: c }))} />
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <p className="text-[12px] font-bold uppercase tracking-wider text-ink-subtle">Preview</p>
                 <StorePreview
                   name={profile.name}

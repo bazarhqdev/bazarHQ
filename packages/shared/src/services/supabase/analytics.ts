@@ -36,10 +36,10 @@ export function createAnalytics(ctx: AdapterContext, myStore: () => Promise<Stor
     const windowFrom = [prev.from, monthAgo].sort()[0]!;
     const [rows, rpc, hasAny] = await Promise.all([
       ctx.q<Row[]>(
-        sb.from('orders').select(ORDER_COLUMNS).eq('store_id', store.id).gte('created_at', startOf(windowFrom)).lt('created_at', endOf(range.to)).limit(20000),
+        sb.from('orders').select(ORDER_COLUMNS).eq('store_id', store.id).eq('is_test', false).gte('created_at', startOf(windowFrom)).lt('created_at', endOf(range.to)).limit(20000),
       ),
       ctx.rpc<Row>('merchant_dashboard', { p_from: startOf(range.from), p_to: endOf(range.to) }),
-      sb.from('orders').select('id', { count: 'exact', head: true }).eq('store_id', store.id),
+      sb.from('orders').select('id', { count: 'exact', head: true }).eq('store_id', store.id).eq('is_test', false),
     ]);
     const orders = rows.map((r) => mapOrder(r));
     const visitorsByDay: Record<string, number> = {};
@@ -53,7 +53,7 @@ export function createAnalytics(ctx: AdapterContext, myStore: () => Promise<Stor
     const before = orders.filter((o) => inRange(o.createdAt, prev));
     const [productsBefore, recent, notes] = await Promise.all([
       sb.from('products').select('id', { count: 'exact', head: true }).eq('store_id', store.id).is('deleted_at', null).lt('created_at', startOf(range.from)),
-      ctx.q<Row[]>(sb.from('orders').select(ORDER_COLUMNS).eq('store_id', store.id).order('created_at', { ascending: false }).limit(6)),
+      ctx.q<Row[]>(sb.from('orders').select(ORDER_COLUMNS).eq('store_id', store.id).eq('is_test', false).order('created_at', { ascending: false }).limit(6)),
       ctx.q<Row[]>(sb.from('notifications').select('*').order('created_at', { ascending: false }).limit(4)),
     ]);
     const lowStock: LowStockItem[] = ((rpc.low_stock ?? []) as Row[]).slice(0, 6).map((l) => ({

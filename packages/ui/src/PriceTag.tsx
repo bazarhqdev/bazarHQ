@@ -4,7 +4,7 @@ import { displayPrice, formatBDT, productPriceRange, type Product, type ProductV
 import { cn } from './cn';
 
 /**
- * Base (selling) price with the optional original/asking price struck through
+ * Base (selling) price with the optional regular price / MRP struck through
  * and the saving. Display only: checkout always charges the base price.
  */
 export function PriceTag({
@@ -32,7 +32,7 @@ export function PriceTag({
       {original !== null && !showRange && (
         <>
           <span className={cn('tabular text-ink-subtle line-through', sub)}>
-            <span className="sr-only">Original price </span>
+            <span className="sr-only">Regular price </span>
             {formatBDT(original)}
           </span>
           <span className={cn('rounded-full bg-red-50 px-1.5 py-px font-bold text-red-700', size === 'lg' ? 'text-sm' : 'text-[11px]')}>{percentOff}% off</span>

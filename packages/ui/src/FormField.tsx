@@ -181,6 +181,7 @@ export function SearchInput({
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-subtle" aria-hidden />
       <input
         type="search"
+        lang="bn"
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}

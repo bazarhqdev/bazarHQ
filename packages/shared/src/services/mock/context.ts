@@ -281,7 +281,7 @@ export function createMockContext(options: MockOptions = {}) {
           credentialHint: null,
           environment: 'sandbox',
           validation: method === 'cod' ? 'not_required' : 'unverified',
-          updatedAt: nowIso(),
+          updatedAt: null,
         });
       }
     }
@@ -305,6 +305,7 @@ export function createMockContext(options: MockOptions = {}) {
       brandColour: s.brandColour,
       themeId: s.themeId,
       themeName: state.themes.find((t) => t.id === s.themeId)?.name ?? null,
+      themeAccent: state.themes.find((t) => t.id === s.themeId)?.accent ?? null,
       category: s.extensions.category,
       returnWindowDays: s.returnWindowDays,
       shipping: s.extensions.shipping,

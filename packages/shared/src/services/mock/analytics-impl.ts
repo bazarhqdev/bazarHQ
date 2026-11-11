@@ -6,7 +6,7 @@ import type { AnalyticsReport, DashboardSummary, DateRange, LowStockItem, Order,
 import type { MockDb } from './seed';
 
 function storeOrders(db: MockDb, store: Store): Order[] {
-  return db.orders.filter((o) => o.storeId === store.id);
+  return db.orders.filter((o) => o.storeId === store.id && !o.isTest);
 }
 
 function customerKey(o: Order) {
