@@ -522,15 +522,25 @@ export function StoreHome() {
 
   return (
     <main>
-      <section className="storefront-hero relative overflow-hidden bg-[var(--store)] text-[var(--store-ink)]">
-        <div
-          className="absolute inset-0 opacity-[0.12]"
-          aria-hidden
-          style={{
-            backgroundImage: 'radial-gradient(circle at 20% 20%, #fff 0 2px, transparent 3px), radial-gradient(circle at 70% 60%, #fff 0 2px, transparent 3px)',
-            backgroundSize: '42px 42px',
-          }}
-        />
+      <section
+        className="storefront-hero relative overflow-hidden bg-[var(--store)] text-[var(--store-ink)]"
+        style={store.bannerUrl ? { color: '#ffffff' } : undefined}
+      >
+        {store.bannerUrl ? (
+          <>
+            <img src={store.bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" aria-hidden loading="eager" />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/60 to-slate-950/20" aria-hidden />
+          </>
+        ) : (
+          <div
+            className="absolute inset-0 opacity-[0.12]"
+            aria-hidden
+            style={{
+              backgroundImage: 'radial-gradient(circle at 20% 20%, #fff 0 2px, transparent 3px), radial-gradient(circle at 70% 60%, #fff 0 2px, transparent 3px)',
+              backgroundSize: '42px 42px',
+            }}
+          />
+        )}
         <div className="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-8 px-4 py-12 md:grid-cols-[1.2fr_1fr] md:py-16">
           <div>
             {store.category && <p className="text-[12px] font-semibold uppercase tracking-[0.14em] opacity-80">{STORE_CATEGORY_LABEL[store.category]}</p>}
@@ -551,13 +561,15 @@ export function StoreHome() {
               </Link>
             </div>
           </div>
-          <div className="hidden grid-cols-3 gap-3 md:grid" aria-hidden>
-            {(popular.data ?? []).slice(0, 6).map((prod, i) => (
-              <div key={prod.id} className={cn('overflow-hidden rounded-2xl ring-4 ring-white/25', i % 2 ? 'translate-y-4' : '')}>
-                <ProductArt name={prod.name} url={primaryImage(prod)} rounded="rounded-2xl" className="aspect-square w-full" />
-              </div>
-            ))}
-          </div>
+          {!store.bannerUrl && (
+            <div className="hidden grid-cols-3 gap-3 md:grid" aria-hidden>
+              {(popular.data ?? []).slice(0, 6).map((prod, i) => (
+                <div key={prod.id} className={cn('overflow-hidden rounded-2xl ring-4 ring-white/25', i % 2 ? 'translate-y-4' : '')}>
+                  <ProductArt name={prod.name} url={primaryImage(prod)} rounded="rounded-2xl" className="aspect-square w-full" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
