@@ -20,6 +20,8 @@ import { mapStore, STORE_COLUMNS } from './mappers';
 const PENDING_KEY = 'bazarhq.sb.pendingVerification';
 const OAUTH_INTENT_KEY = 'bazarhq.sb.oauthIntent';
 const ADMIN_ACTIVITY_KEY = 'bazarhq.sb.adminActivity';
+const PASSWORD_RECOVERY_KEY = 'bazarhq.sb.passwordRecovery';
+const RECOVERY_SESSION_MAX_AGE = 15 * 60 * 1000;
 const GENERIC_LOGIN = 'Incorrect email or password.';
 
 interface PendingVerification {
@@ -150,8 +152,16 @@ export function createAuth(ctx: AdapterContext) {
 
   // Short-lived cache: getSession() is called on every screen; profile/store reads are cheap but not free.
   let cache: { token: string; at: number; session: Session } | null = null;
-  sb.auth.onAuthStateChange(() => {
+  sb.auth.onAuthStateChange((event, session) => {
     cache = null;
+    // Supabase's default recovery email verifies the link before redirecting.
+    // Record the PASSWORD_RECOVERY event (never the access/refresh tokens) so the
+    // reset page can distinguish that session from an ordinary signed-in user.
+    if (event === 'PASSWORD_RECOVERY' && session) {
+      writeJson(PASSWORD_RECOVERY_KEY, { userId: session.user.id, seenAt: Date.now() });
+    } else if (event === 'SIGNED_OUT') {
+      writeJson(PASSWORD_RECOVERY_KEY, null);
+    }
   });
   function invalidate() {
     cache = null;
@@ -312,17 +322,50 @@ export function createAuth(ctx: AdapterContext) {
 
     async requestPasswordReset(email) {
       // Same response whether or not the address exists (no enumeration).
-      const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${origin(ctx)}${resetPath()}` });
+      // The query marker survives redirect even when supabase-js consumes
+      // the access/refresh-token URL fragment during client initialization.
+      // Preserve the native callback URL separately from this web-only marker.
+      const redirectTo = `${origin(ctx)}${resetPath()}${ctx.config.oauthCallbackUrl ? '' : '?recovery=1'}`;
+      const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
       if (error && authError(error).code === 'RATE_LIMITED') throw authError(error);
     },
 
     async resetPassword(token, password) {
-      // The recovery email template links to …?token={{ .TokenHash }} (see supabase/templates/recovery.html).
-      const { error } = await sb.auth.verifyOtp({ token_hash: token, type: 'recovery' });
-      if (error) throw new ServiceError('VALIDATION', 'This reset link is invalid or has expired. Request a new one.');
+      const invalidLink = () => new ServiceError('VALIDATION', 'This reset link is invalid or has expired. Request a new one.');
+      if (token === 'recovery:session') {
+        // Only a real PASSWORD_RECOVERY auth event can authorize this path.
+        // A bare ?recovery=1 parameter does NOT authorize password changes.
+        const marker = readJson<{ userId: string; seenAt: number }>(PASSWORD_RECOVERY_KEY);
+        const { data, error } = await sb.auth.getSession();
+        if (
+          error || !data.session || !marker ||
+          marker.userId !== data.session.user.id ||
+          !Number.isFinite(marker.seenAt) ||
+          Date.now() - marker.seenAt < 0 ||
+          Date.now() - marker.seenAt > RECOVERY_SESSION_MAX_AGE
+        ) throw invalidLink();
+      } else if (token.startsWith('recovery:code:')) {
+        const code = token.slice('recovery:code:'.length);
+        if (!code) throw invalidLink();
+        const { error } = await sb.auth.exchangeCodeForSession(code);
+        if (error) throw invalidLink();
+      } else if (token.startsWith('recovery:tokens:')) {
+        const params = new URLSearchParams(token.slice('recovery:tokens:'.length));
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+        if (params.get('type') !== 'recovery' || !access_token || !refresh_token) throw invalidLink();
+        const { error } = await sb.auth.setSession({ access_token, refresh_token });
+        if (error) throw invalidLink();
+      } else {
+        // Custom email templates may link directly to ?token_hash=... or ?token=...
+        if (!token) throw invalidLink();
+        const { error } = await sb.auth.verifyOtp({ token_hash: token, type: 'recovery' });
+        if (error) throw invalidLink();
+      }
       const upd = await sb.auth.updateUser({ password });
       if (upd.error) throw authError(upd.error);
-      // Single-use link; end every session after a reset.
+      // End sessions after update and invalidate the one-time recovery intent.
+      writeJson(PASSWORD_RECOVERY_KEY, null);
       await sb.auth.signOut({ scope: 'global' });
     },
 

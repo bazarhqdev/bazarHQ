@@ -1,18 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
 import { errorMessage, resetPasswordSchema, toFieldErrors, type FieldErrors } from '@bazarhq/shared';
 import { Alert, Button, useServices, useToast } from '@bazarhq/ui';
 import { PasswordField } from '@/components/shared/auth';
 import { paths } from '@/lib/paths';
+import { usePasswordRecoveryLink } from '@/lib/use-password-recovery-link';
 
 function ResetForm() {
   const services = useServices();
   const toast = useToast();
   const router = useRouter();
-  const token = useSearchParams().get('token') ?? '';
+  const { ready: linkChecked, credential: token, error: linkError } = usePasswordRecoveryLink();
   const [form, setForm] = useState({ password: '', confirmPassword: '' });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +27,7 @@ function ResetForm() {
     setBusy(true);
     setError(null);
     try {
+      if (!token) throw new Error('Password recovery link is missing or invalid.');
       await services.auth.resetPassword(token, form.password);
       toast.success('Password updated', 'Sign in with your new password. Other sessions were signed out.');
       router.replace(paths.login);
@@ -35,10 +37,12 @@ function ResetForm() {
     }
   };
 
+  if (!linkChecked) return <p role="status" className="text-sm text-ink-muted">Checking password recovery link…</p>;
+
   if (!token) {
     return (
       <Alert tone="danger" title="Invalid reset link">
-        This link is missing its token.{' '}
+        {linkError ?? 'This reset link is invalid.'}{' '}
         <Link href={paths.forgotPassword} className="font-semibold underline">
           Request a new one
         </Link>
